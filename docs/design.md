@@ -149,12 +149,12 @@ spegel-pod2<-->|p2p|spegel-pod3
 ### API
 
 ImagePrefetch Resource
-| Field            | Type              | Required | Description                                                |
-| ---------------- | ----------------- | -------- | ---------------------------------------------------------- |
-| images           | []string          | true     | List of images to pre-download                             |
-| nodeSelector     | map[string]string | false    | Specify the nodes to which the image should be downloaded  |
-| replicas         | int               | false    | Set the number of image download nodes                     |
-| imagePullSecrets | []string          | false    | Secret used for authentication with the container registry |
+| Field            | Type                          | Required | Description                                                |
+| ---------------- | ----------------------------- | -------- | ---------------------------------------------------------- |
+| images           | []string                      | true     | List of images to pre-download                             |
+| nodeSelector     | map[string]string             | false    | Specify the nodes to which the image should be downloaded  |
+| replicas         | int                           | false    | Set the number of image download nodes                     |
+| imagePullSecrets | []corev1.LocalObjectReference | false    | Secret used for authentication with the container registry |
 
 ```
 kind: ImagePrefetch

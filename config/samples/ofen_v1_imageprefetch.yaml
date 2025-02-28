@@ -1,0 +1,12 @@
+apiVersion: ofen.cybozu.io/v1
+kind: ImagePrefetch
+metadata:
+  labels:
+    app.kubernetes.io/name: ofen
+    app.kubernetes.io/managed-by: kustomize
+  name: imageprefetch-sample
+spec:
+  images:
+    - ghcr.io/cybozu/ubuntu:24.04
+  replicas: 1
+  

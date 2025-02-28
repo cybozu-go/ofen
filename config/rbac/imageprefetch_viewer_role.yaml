@@ -1,32 +1,23 @@
----
+# permissions for end users to view imageprefetches.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: manager-role
+  labels:
+    app.kubernetes.io/name: ofen
+    app.kubernetes.io/managed-by: kustomize
+  name: imageprefetch-viewer-role
 rules:
 - apiGroups:
   - ofen.cybozu.io
   resources:
   - imageprefetches
   verbs:
-  - create
-  - delete
   - get
   - list
-  - patch
-  - update
   - watch
-- apiGroups:
-  - ofen.cybozu.io
-  resources:
-  - imageprefetches/finalizers
-  verbs:
-  - update
 - apiGroups:
   - ofen.cybozu.io
   resources:
   - imageprefetches/status
   verbs:
   - get
-  - patch
-  - update

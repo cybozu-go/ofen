@@ -1,6 +1,16 @@
-domain: ofen.cybozu.io
+domain: cybozu.io
 layout:
 - go.kubebuilder.io/v4
 projectName: ofen
 repo: github.com/cybozu-go/ofen
+resources:
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: cybozu.io
+  group: ofen
+  kind: ImagePrefetch
+  path: github.com/cybozu-go/ofen/api/v1
+  version: v1
 version: "3"
