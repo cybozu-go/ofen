@@ -27,6 +27,11 @@ manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and Cust
 .PHONY: generate
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
+	
+.PHONY: check-generate
+check-generate:
+	$(MAKE) manifests generate k8s-client-gen
+	git diff --exit-code --name-only
 
 # refer to https://github.com/statnett/image-scanner-operator/pull/668/files
 GO_MODULE = $(shell go list -m)
