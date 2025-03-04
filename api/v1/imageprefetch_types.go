@@ -54,6 +54,10 @@ type ImagePrefetchStatus struct {
 	// +optional
 	// +kubebuilder:default:=0
 	ImagePullFailedNodes int `json:"imagePullFailedNodes,omitempty"`
+
+	// SelectedNodes represents the nodes that have been selected to download the images
+	// +optional
+	SelectedNodes []string `json:"selectedNodes,omitempty"`
 }
 
 const (

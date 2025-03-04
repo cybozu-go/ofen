@@ -80,6 +80,8 @@ const (
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:scope=Cluster
+// +genclient
+// +genclient:nonNamespaced
 
 // NodeImageSet is the Schema for the nodeimagesets API
 type NodeImageSet struct {
