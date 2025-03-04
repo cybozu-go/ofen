@@ -104,7 +104,7 @@ func deleteAllNodes(ctx context.Context) {
 	}
 }
 
-var _ = Describe("ImagePrefetch Controller", func() {
+var _ = Describe("ImagePrefetch Controller", Serial, func() {
 	Context("When reconciling a resource", func() {
 		ctx := context.Background()
 		var stopFunc func()
