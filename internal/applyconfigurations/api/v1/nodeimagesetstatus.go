@@ -9,12 +9,13 @@ import (
 // NodeImageSetStatusApplyConfiguration represents a declarative configuration of the NodeImageSetStatus type for use
 // with apply.
 type NodeImageSetStatusApplyConfiguration struct {
-	ImagePrefetchGeneration *int64                           `json:"imagePrefetchGeneration,omitempty"`
-	ObservedGeneration      *int64                           `json:"observedGeneration,omitempty"`
-	Conditions              []v1.ConditionApplyConfiguration `json:"conditions,omitempty"`
-	DesiredImages           *int                             `json:"desiredImages,omitempty"`
-	AvailableImages         *int                             `json:"availableImages,omitempty"`
-	DownloadFailedImages    *int                             `json:"downloadFailedImages,omitempty"`
+	ImagePrefetchGeneration *int64                                   `json:"imagePrefetchGeneration,omitempty"`
+	ObservedGeneration      *int64                                   `json:"observedGeneration,omitempty"`
+	Conditions              []v1.ConditionApplyConfiguration         `json:"conditions,omitempty"`
+	DesiredImages           *int                                     `json:"desiredImages,omitempty"`
+	AvailableImages         *int                                     `json:"availableImages,omitempty"`
+	DownloadFailedImages    *int                                     `json:"downloadFailedImages,omitempty"`
+	ContainerImageStatuses  []ContainerImageStatusApplyConfiguration `json:"containerImageStatuses,omitempty"`
 }
 
 // NodeImageSetStatusApplyConfiguration constructs a declarative configuration of the NodeImageSetStatus type for use with
@@ -73,5 +74,18 @@ func (b *NodeImageSetStatusApplyConfiguration) WithAvailableImages(value int) *N
 // If called multiple times, the DownloadFailedImages field is set to the value of the last call.
 func (b *NodeImageSetStatusApplyConfiguration) WithDownloadFailedImages(value int) *NodeImageSetStatusApplyConfiguration {
 	b.DownloadFailedImages = &value
+	return b
+}
+
+// WithContainerImageStatuses adds the given value to the ContainerImageStatuses field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the ContainerImageStatuses field.
+func (b *NodeImageSetStatusApplyConfiguration) WithContainerImageStatuses(values ...*ContainerImageStatusApplyConfiguration) *NodeImageSetStatusApplyConfiguration {
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithContainerImageStatuses")
+		}
+		b.ContainerImageStatuses = append(b.ContainerImageStatuses, *values[i])
+	}
 	return b
 }

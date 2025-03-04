@@ -104,7 +104,7 @@ func deleteAllNodes(ctx context.Context) {
 	}
 }
 
-var _ = Describe("ImagePrefetch Controller", func() {
+var _ = Describe("ImagePrefetch Controller", Serial, func() {
 	Context("When reconciling a resource", func() {
 		ctx := context.Background()
 		var stopFunc func()
@@ -150,7 +150,7 @@ var _ = Describe("ImagePrefetch Controller", func() {
 			time.Sleep(100 * time.Millisecond)
 		})
 
-		It("should create NodeImageSets according to the number specified in .spec.replicas.", func() {
+		It("should create NodeImageSets according to the number specified in .spec.replicas", func() {
 			By("creating a new ImagePrefetch with replicas")
 			testName := "replica-node-image-set"
 			replicas := 1

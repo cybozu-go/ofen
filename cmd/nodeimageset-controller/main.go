@@ -6,12 +6,15 @@ import (
 	"fmt"
 	"os"
 
+	containerd "github.com/containerd/containerd/v2/client"
 	ofenv1 "github.com/cybozu-go/ofen/api/v1"
 	"github.com/cybozu-go/ofen/internal/controller"
+	"github.com/cybozu-go/ofen/internal/imgmanager"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/filters"
@@ -36,6 +39,7 @@ func main() {
 	var secureMetrics bool
 	var enableHTTP2 bool
 	var tlsOpts []func(*tls.Config)
+	var containerdConfig imgmanager.ContainerdConfig
 	flag.StringVar(&metricsAddr, "metrics-bind-address", "0", "The address the metrics endpoint binds to. "+
 		"Use :8443 for HTTPS or :8080 for HTTP, or leave as 0 to disable the metrics service.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
@@ -46,6 +50,11 @@ func main() {
 		"If set, the metrics endpoint is served securely via HTTPS. Use --metrics-secure=false to use HTTP instead.")
 	flag.BoolVar(&enableHTTP2, "enable-http2", false,
 		"If set, HTTP/2 will be enabled for the metrics and webhook servers")
+	flag.StringVar(&containerdConfig.SockAddr, "containerd-socket",
+		"/run/containerd/containerd.sock", "Containerd socket address")
+	flag.StringVar(&containerdConfig.Namespace, "containerd-namespace", "k8s.io", "Containerd namespace")
+	flag.StringVar(&containerdConfig.HostDir, "containerd-host-dir",
+		"/etc/containerd/certs.d", "Containerd host directory")
 	opts := zap.Options{
 		Development: true,
 	}
@@ -96,10 +105,29 @@ func main() {
 		os.Exit(1)
 	}
 
+	client, err := containerd.New(containerdConfig.SockAddr)
+	if err != nil {
+		setupLog.Error(err, "unable to connect to containerd")
+		os.Exit(1)
+	}
+	defer func() {
+		if err := client.Close(); err != nil {
+			setupLog.Error(err, "failed to close containerd client")
+		}
+	}()
+
+	containerdClient := imgmanager.NewContainerd(&containerdConfig, client)
+	log := ctrl.Log.WithName("image-puller").WithValues("nodeName", nodeName)
+	ch := make(chan event.TypedGenericEvent[*ofenv1.NodeImageSet])
+	imagePuller := controller.NewImagePuller(log, containerdClient, mgr.GetClient(), ch)
+
 	if err = (&controller.NodeImageSetReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
+		Client:      mgr.GetClient(),
+		Scheme:      mgr.GetScheme(),
+		NodeName:    nodeName,
+		Recorder:    mgr.GetEventRecorderFor("nodeimageset-controller"),
+		ImagePuller: imagePuller,
+	}).SetupWithManager(mgr, ch); err != nil {
 		setupLog.Error(err, "unable to start controller", "controller", "nodeimageset")
 		os.Exit(1)
 	}

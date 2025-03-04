@@ -45,7 +45,7 @@ type ImagePrefetchReconciler struct {
 // +kubebuilder:rbac:groups=ofen.cybozu.io,resources=imageprefetches,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=ofen.cybozu.io,resources=imageprefetches/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=ofen.cybozu.io,resources=imageprefetches/finalizers,verbs=update
-// +kubebuilder:rbac:groups=ofen.cybozu.io,resources=nodeimagesets,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=ofen.cybozu.io,resources=nodeimagesets,verbs=get;list;watch;create;update;patch;delete;deletecollection
 // +kubebuilder:rbac:groups=core,resources=nodes,verbs=get;list;watch
 
 func (r *ImagePrefetchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -362,7 +362,7 @@ func getNodeImageSetName(imgPrefetch *ofenv1.ImagePrefetch, nodeName string) (st
 		return "", fmt.Errorf("failed to write string to sha1: %w", err)
 	}
 	hash := hex.EncodeToString(hasher.Sum(nil))
-	return fmt.Sprintf("%s-%s-%s", constants.NodeImageSetPrefix, name, hash[:8]), nil
+	return fmt.Sprintf("%s-%s-%s", constants.NodeImageSetNamePrefix, name, hash[:8]), nil
 }
 
 func (r *ImagePrefetchReconciler) updateStatus(ctx context.Context, imgPrefetch *ofenv1.ImagePrefetch, selectedNodes []string) (ctrl.Result, error) {
