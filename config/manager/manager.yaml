@@ -63,7 +63,8 @@ spec:
         args:
           - --leader-elect
           - --health-probe-bind-address=:8081
-        image: controller:latest
+        image: image-prefetch:dev
+        imagePullPolicy: Never
         name: manager
         securityContext:
           allowPrivilegeEscalation: false
