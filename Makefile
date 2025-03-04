@@ -1,4 +1,4 @@
-IMG ?= controller:latest
+IMG ?= image-prefetch:dev
 ENVTEST_K8S_VERSION = 1.31.0
 
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
@@ -28,6 +28,22 @@ manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and Cust
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
 
+# refer to https://github.com/statnett/image-scanner-operator/pull/668/files
+GO_MODULE = $(shell go list -m)
+API_DIRS = $(shell find api -mindepth 1 -type d | sed "s|^|$(shell go list -m)/|" | paste -sd " " )
+.PHONY: k8s-client-gen
+k8s-client-gen: applyconfiguration-gen models-schema
+	@echo "generating"
+	$(MODELS_SCHEMA) > /tmp/schema.json
+	rm -rf internal/client/applyconfigurations
+	$(APPLYCONFIGURATION_GEN) \
+        --go-header-file hack/boilerplate.go.txt \
+		--output-dir internal/applyconfigurations \
+		--output-pkg $(GO_MODULE)/internal/applyconfigurations \
+		--openapi-schema /tmp/schema.json \
+		$(API_DIRS)
+	rm -f /tmp/schema.json
+
 .PHONY: fmt
 fmt: ## Run go fmt against code.
 	go fmt ./...
@@ -37,8 +53,8 @@ vet: ## Run go vet against code.
 	go vet ./...
 
 .PHONY: test
-test: manifests generate fmt vet envtest ## Run tests.
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test $$(go list ./... | grep -v /e2e) -coverprofile cover.out
+test: manifests generate fmt vet envtest ginkgo ## Run tests.
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" $(GINKGO) run --skip-file e2e.* -r --coverprofile cover.out
 
 # Utilize Kind or modify the e2e tests to load the image locally, enabling compatibility with other vendors.
 .PHONY: test-e2e  # Run the e2e tests against a Kind k8s instance that is spun up.
@@ -111,12 +127,18 @@ KUSTOMIZE ?= $(LOCALBIN)/kustomize
 CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
 ENVTEST ?= $(LOCALBIN)/setup-envtest
 GOLANGCI_LINT = $(LOCALBIN)/golangci-lint
+GINKGO = $(LOCALBIN)/ginkgo
+APPLYCONFIGURATION_GEN = $(LOCALBIN)/applyconfiguration-gen
+MODELS_SCHEMA = $(LOCALBIN)/models-schema
 
 ## Tool Versions
 KUSTOMIZE_VERSION ?= v5.6.0
 CONTROLLER_TOOLS_VERSION ?= v0.17.2
 ENVTEST_VERSION ?= release-0.20
 GOLANGCI_LINT_VERSION ?= v1.64.5
+GINKGO_VERSION ?= v2.1.4
+CODE_GENERATOR_VERSION ?= v0.31.1
+MODELS_SCHEMA_VERSION ?= v1.31.1
 
 .PHONY: kustomize
 kustomize: $(KUSTOMIZE) ## Download kustomize locally if necessary.
@@ -137,6 +159,26 @@ $(ENVTEST): $(LOCALBIN)
 golangci-lint: $(GOLANGCI_LINT) ## Download golangci-lint locally if necessary.
 $(GOLANGCI_LINT): $(LOCALBIN)
 	$(call go-install-tool,$(GOLANGCI_LINT),github.com/golangci/golangci-lint/cmd/golangci-lint,$(GOLANGCI_LINT_VERSION))
+
+.PHONY: ginkgo
+ginkgo: $(GINKGO) ## Download ginkgo locally if necessary.
+$(GINKGO): $(LOCALBIN)
+	$(call go-install-tool,$(GINKGO),github.com/onsi/ginkgo/v2/ginkgo,$(GINKGO_VERSION))
+
+.PHONY: models-schema
+models-schema: $(LOCALBIN) ## Download models-schema locally if necessary.
+	test -s $(LOCALBIN)/models-schema || \
+	( \
+		mkdir -p /tmp/work-models-schema/pkg/generated/openapi/cmd/models-schema && \
+		curl -sSfL https://github.com/kubernetes/kubernetes/archive/$(MODELS_SCHEMA_VERSION).tar.gz | tar -C /tmp/work-models-schema -xzf - --strip-components=1 &&\
+		cd /tmp/work-models-schema/pkg/generated/openapi/cmd/models-schema &&\
+		GOBIN=$(LOCALBIN) go install \
+	)
+
+.PHONY: applyconfiguration-gen
+applyconfiguration-gen: $(APPLYCONFIGURATION_GEN) ## Download applyconfiguration-gen locally if necessary.
+$(APPLYCONFIGURATION_GEN): $(LOCALBIN)
+	$(call go-install-tool,$(APPLYCONFIGURATION_GEN),k8s.io/code-generator/cmd/applyconfiguration-gen,$(CODE_GENERATOR_VERSION))
 
 # go-install-tool will 'go install' any package with custom target and name of binary, if it doesn't exist
 # $1 - target path with name of binary
