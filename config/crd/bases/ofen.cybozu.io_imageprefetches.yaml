@@ -166,6 +166,10 @@ spec:
                 description: The generation observed by the controller.
                 format: int64
                 type: integer
+              selectedNodes:
+                items:
+                  type: string
+                type: array
             type: object
         type: object
     served: true
