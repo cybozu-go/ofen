@@ -51,6 +51,8 @@ var _ = BeforeSuite(func() {
 
 	err = ofenv1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
+	err = scheme.AddToScheme(scheme.Scheme)
+	Expect(err).NotTo(HaveOccurred())
 
 	// +kubebuilder:scaffold:scheme
 

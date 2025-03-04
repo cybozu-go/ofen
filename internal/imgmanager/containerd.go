@@ -1,0 +1,133 @@
+package imgmanager
+
+import (
+	"context"
+
+	"fmt"
+
+	"github.com/containerd/containerd/namespaces"
+	containerdclient "github.com/containerd/containerd/v2/client"
+	"github.com/containerd/containerd/v2/core/diff"
+	"github.com/containerd/containerd/v2/core/remotes"
+	"github.com/containerd/containerd/v2/core/remotes/docker"
+	"github.com/containerd/containerd/v2/core/remotes/docker/config"
+	ofenv1 "github.com/cybozu-go/ofen/api/v1"
+	"sigs.k8s.io/controller-runtime/pkg/log"
+)
+
+type ContainerdConfig struct {
+	SockAddr  string
+	Namespace string
+	HostDir   string
+}
+
+type Containerd struct {
+	ctx              context.Context
+	client           *containerdclient.Client
+	containerdConfig *ContainerdConfig
+	tokens           map[string]Credentials
+}
+
+type Credentials struct {
+	Username string
+	Password string
+}
+
+func NewContainerd(ctx context.Context, containerdConfig *ContainerdConfig, client *containerdclient.Client) *Containerd {
+	return &Containerd{
+		ctx:              ctx,
+		containerdConfig: containerdConfig,
+		client:           client,
+	}
+}
+
+func (c *Containerd) IsImageExists(ctx context.Context, ref string) (bool, error) {
+	ctx = namespaces.WithNamespace(ctx, c.containerdConfig.Namespace)
+	filter := fmt.Sprintf("name==%s", ref)
+	images, err := c.client.ListImages(ctx, filter)
+	if err != nil {
+		return false, fmt.Errorf("failed to list images: %w", err)
+	}
+
+	return len(images) != 0, nil
+}
+
+func (c *Containerd) PullImage(ctx context.Context, ref string, policy ofenv1.RegistryPolicy) error {
+	ctx = namespaces.WithNamespace(ctx, c.containerdConfig.Namespace)
+
+	var useMirrorOnly bool
+	switch policy {
+	case ofenv1.RegistryPolicyDefault:
+		useMirrorOnly = false
+	case ofenv1.RegistryPolicyMirrorOnly:
+		useMirrorOnly = true
+	default:
+		return fmt.Errorf("unknown registry policy %q", policy)
+	}
+
+	resolver := c.setupResolver(ctx, useMirrorOnly)
+	pullOptions := []containerdclient.RemoteOpt{
+		containerdclient.WithPullUnpack,
+		containerdclient.WithResolver(resolver),
+		containerdclient.WithUnpackOpts([]containerdclient.UnpackOpt{
+			containerdclient.WithUnpackApplyOpts(diff.WithSyncFs(true)), // force sync fs
+		}),
+	}
+
+	_, err := c.client.Pull(ctx, ref, pullOptions...)
+	if err != nil {
+		return fmt.Errorf("failed to pull image %s: %w", ref, err)
+	}
+
+	return nil
+}
+
+func (c *Containerd) setupResolver(ctx context.Context, useMirrorOnly bool) remotes.Resolver {
+	ctx = namespaces.WithNamespace(ctx, c.containerdConfig.Namespace)
+	hostOpt := config.HostOptions{
+		HostDir:     config.HostDirFromRoot(c.containerdConfig.HostDir),
+		Credentials: c.credentials(),
+	}
+	resolveOpt := docker.ResolverOptions{
+		Hosts: config.ConfigureHosts(ctx, hostOpt),
+	}
+
+	if useMirrorOnly {
+		resolveOpt.Hosts = registryMirrorHosts(ctx, hostOpt)
+	}
+
+	return docker.NewResolver(resolveOpt)
+}
+
+func (c *Containerd) credentials() func(host string) (string, string, error) {
+	return func(host string) (string, string, error) {
+		if h, ok := c.tokens[host]; ok {
+			return h.Username, h.Password, nil
+		}
+
+		return "", "", nil
+	}
+}
+
+func registryMirrorHosts(ctx context.Context, hostOpt config.HostOptions) docker.RegistryHosts {
+	logger := log.FromContext(ctx)
+
+	return func(host string) ([]docker.RegistryHost, error) {
+		logger.Info("skipping upstream registry as mirror-only policy is set", "host", host)
+		hosts := config.ConfigureHosts(ctx, hostOpt)
+		rhosts, err := hosts(host)
+		if err != nil {
+			logger.Error(err, "failed to get registry hosts", "host", host)
+			return nil, err
+		}
+
+		mirrorHosts := []docker.RegistryHost{}
+		for _, rhost := range rhosts {
+			if rhost.Host == host {
+				continue
+			}
+			mirrorHosts = append(mirrorHosts, rhost)
+		}
+		return mirrorHosts, nil
+	}
+}
