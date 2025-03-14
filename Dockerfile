@@ -1,5 +1,5 @@
 # Build the manager binary
-FROM ghcr.io/cybozu/golang:1.23-noble AS builder
+FROM ghcr.io/cybozu/golang:1.24-noble AS builder
 ARG TARGETOS
 ARG TARGETARCH
 
@@ -11,7 +11,7 @@ RUN go mod download
 # Copy the go source
 COPY cmd/main.go cmd/main.go
 COPY api/ api/
-COPY internal/controller/ internal/controller/
+COPY internal/ internal/
 
 # Build
 RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -a -o manager cmd/main.go
