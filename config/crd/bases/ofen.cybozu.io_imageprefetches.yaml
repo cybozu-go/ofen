@@ -166,6 +166,12 @@ spec:
                 description: The generation observed by the controller.
                 format: int64
                 type: integer
+              selectedNodes:
+                description: SelectedNodes represents the nodes that have been selected
+                  to download the images
+                items:
+                  type: string
+                type: array
             type: object
         type: object
     served: true
