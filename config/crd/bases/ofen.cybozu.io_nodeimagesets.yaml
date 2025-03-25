@@ -14,7 +14,22 @@ spec:
     singular: nodeimageset
   scope: Cluster
   versions:
-  - name: v1
+  - additionalPrinterColumns:
+    - format: int32
+      jsonPath: .status.desiredImages
+      name: Desired
+      type: integer
+    - jsonPath: .status.availableImages
+      name: Available
+      type: integer
+    - jsonPath: .status.downloadFailedImages
+      name: Failed
+      type: integer
+    - jsonPath: .spec.nodeName
+      name: NODE
+      priority: 1
+      type: string
+    name: v1
     schema:
       openAPIV3Schema:
         description: NodeImageSet is the Schema for the nodeimagesets API
