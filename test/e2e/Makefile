@@ -44,8 +44,7 @@ start:
 
 .PHONY: test
 test:
-	env RUN_E2E=1 \
-		go test -v -race . -ginkgo.v -ginkgo.fail-fast
+	go test -v -race . -ginkgo.v -ginkgo.fail-fast
 
 .PHONY: logs
 logs:
