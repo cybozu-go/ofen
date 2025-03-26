@@ -146,7 +146,9 @@ func (r *ImagePrefetchReconciler) selectTargetNodes(ctx context.Context, imgPref
 
 		availableNodes := []string{}
 		for _, node := range allNodes.Items {
-			availableNodes = append(availableNodes, node.Name)
+			if util.IsNodeReady(&node) {
+				availableNodes = append(availableNodes, node.Name)
+			}
 		}
 
 		needsNodeSelection := isNeedNodeSelection(imgPrefetch, availableNodes)
