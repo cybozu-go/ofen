@@ -12,7 +12,7 @@ type ImagePrefetchSpec struct {
 
 	// NodeSelector is a map of key-value pairs that specify which nodes should have the images pre-downloaded
 	// +optional
-	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
+	NodeSelector metav1.LabelSelector `json:"nodeSelector,omitempty"`
 
 	// Replicas is the number of nodes that should download the specified images
 	// +optional

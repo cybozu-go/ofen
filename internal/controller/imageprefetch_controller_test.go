@@ -506,8 +506,17 @@ var _ = Describe("ImagePrefetch Controller", func() {
 
 			By("creating ImagePrefetch with node selector")
 			testName := "node-selector"
-			nodeSelector := map[string]string{
-				"topology.kubernetes.io/zone": rackNumber[1],
+			nodeSelector := metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"topology.kubernetes.io/zone": rackNumber[1],
+				},
+				MatchExpressions: []metav1.LabelSelectorRequirement{
+					{
+						Key:      "kubernetes.io/hostname",
+						Operator: metav1.LabelSelectorOpIn,
+						Values:   []string{"worker1", "worker-4", "worker-6"},
+					},
+				},
 			}
 
 			createNamespace(testName)
@@ -526,7 +535,10 @@ var _ = Describe("ImagePrefetch Controller", func() {
 					}),
 				})
 				g.Expect(err).NotTo(HaveOccurred())
-				g.Expect(len(nodeImageSets.Items)).To(Equal(3))
+				g.Expect(len(nodeImageSets.Items)).To(Equal(2))
+				for _, nodeImageSet := range nodeImageSets.Items {
+					g.Expect(nodeImageSet.Spec.NodeName).To(SatisfyAny(Equal("worker-4"), Equal("worker-6")))
+				}
 
 				actualImages := []string{}
 				for _, nodeImageSet := range nodeImageSets.Items {
@@ -539,15 +551,17 @@ var _ = Describe("ImagePrefetch Controller", func() {
 
 				defaultPolicy, mirrorOnly := countRegistryPolicy(nodeImageSets)
 				g.Expect(defaultPolicy).To(Equal(2)) // 1 node * 2 image
-				g.Expect(mirrorOnly).To(Equal(4))    // 2 node * 2 image
+				g.Expect(mirrorOnly).To(Equal(2))    // 1 node * 2 image
 			}).Should(Succeed())
 		})
 
 		It("should increase or decrease the number of NodeImageSets when nodes are added or removed", func() {
 			By("creating ImagePrefetch with node selector")
 			testName := "add-remove-node"
-			nodeSelector := map[string]string{
-				"beta.kubernetes.io/arch": "amd64",
+			nodeSelector := metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"beta.kubernetes.io/arch": "amd64",
+				},
 			}
 			createNamespace(testName)
 			createNewImagePrefetch(testName,
