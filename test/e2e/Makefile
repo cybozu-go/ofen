@@ -54,6 +54,4 @@ logs:
 .PHONY: stop
 stop:
 	$(KIND) delete cluster --name=$(KIND_CLUSTER_NAME)
-	-docker image rm prefetch:dev
-	-docker image prune -f
-	-pgrep -f cloud-provider-kind | xargs kill 
+	-docker image rm image-prefetch:dev
