@@ -48,10 +48,8 @@ test:
 
 .PHONY: logs
 logs:
-	rm -rf logs.tar.gz logs
-	$(KIND) export logs --name=$(KIND_CLUSTER_NAME) ./logs
-	tar czf logs.tar.gz logs
 	rm -rf logs
+	$(KIND) export logs --name=$(KIND_CLUSTER_NAME) ./logs
 
 .PHONY: stop
 stop:
