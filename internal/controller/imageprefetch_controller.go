@@ -131,6 +131,10 @@ func (r *ImagePrefetchReconciler) selectTargetNodes(ctx context.Context, imgPref
 			return nil, err
 		}
 
+		if imgPrefetch.Spec.Replicas > 0 {
+			return getNodeNames(nodes[:imgPrefetch.Spec.Replicas]), nil
+		}
+
 		return getNodeNames(nodes), nil
 	}
 
