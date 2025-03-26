@@ -68,25 +68,19 @@ spec:
               imageSet:
                 description: ImageSet is a list of image sets to be downloaded.
                 items:
-                  properties:
-                    image:
-                      description: image is the name of the image.
-                      type: string
-                    registryPolicy:
-                      description: Registry Policy is the policy for downloading images
-                        from the registry.
-                      type: string
-                  required:
-                  - image
-                  - registryPolicy
-                  type: object
+                  type: string
                 type: array
               nodeName:
                 description: NodeName is the name of the node where the image is downloaded.
                 type: string
+              registryPolicy:
+                description: Registry Policy is the policy for downloading images
+                  from the registry.
+                type: string
             required:
             - imageSet
             - nodeName
+            - registryPolicy
             type: object
           status:
             description: NodeImageSetStatus defines the observed state of NodeImageSet

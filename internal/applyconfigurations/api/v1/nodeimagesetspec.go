@@ -3,13 +3,15 @@
 package v1
 
 import (
+	v1 "github.com/cybozu-go/ofen/api/v1"
 	corev1 "k8s.io/api/core/v1"
 )
 
 // NodeImageSetSpecApplyConfiguration represents a declarative configuration of the NodeImageSetSpec type for use
 // with apply.
 type NodeImageSetSpecApplyConfiguration struct {
-	ImageSet                []ImageSetApplyConfiguration  `json:"imageSet,omitempty"`
+	ImageSet                []string                      `json:"imageSet,omitempty"`
+	RegistryPolicy          *v1.RegistryPolicy            `json:"registryPolicy,omitempty"`
 	NodeName                *string                       `json:"nodeName,omitempty"`
 	ImagePullSecrets        []corev1.LocalObjectReference `json:"imagePullSecrets,omitempty"`
 	ImageDownloadRetryLimit *int32                        `json:"imageDownloadRetryLimit,omitempty"`
@@ -24,13 +26,18 @@ func NodeImageSetSpec() *NodeImageSetSpecApplyConfiguration {
 // WithImageSet adds the given value to the ImageSet field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the ImageSet field.
-func (b *NodeImageSetSpecApplyConfiguration) WithImageSet(values ...*ImageSetApplyConfiguration) *NodeImageSetSpecApplyConfiguration {
+func (b *NodeImageSetSpecApplyConfiguration) WithImageSet(values ...string) *NodeImageSetSpecApplyConfiguration {
 	for i := range values {
-		if values[i] == nil {
-			panic("nil value passed to WithImageSet")
-		}
-		b.ImageSet = append(b.ImageSet, *values[i])
+		b.ImageSet = append(b.ImageSet, values[i])
 	}
+	return b
+}
+
+// WithRegistryPolicy sets the RegistryPolicy field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the RegistryPolicy field is set to the value of the last call.
+func (b *NodeImageSetSpecApplyConfiguration) WithRegistryPolicy(value v1.RegistryPolicy) *NodeImageSetSpecApplyConfiguration {
+	b.RegistryPolicy = &value
 	return b
 }
 
