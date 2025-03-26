@@ -3,7 +3,6 @@ package controller
 import (
 	"context"
 	"fmt"
-	"slices"
 	"time"
 
 	ofenv1 "github.com/cybozu-go/ofen/api/v1"
@@ -105,19 +104,14 @@ var _ = Describe("ImagePrefetch Controller", func() {
 				g.Expect(err).NotTo(HaveOccurred())
 				g.Expect(nodeImageSets.Items).To(HaveLen(replicas))
 
-				actualImages := []string{}
 				for _, nodeImageSet := range nodeImageSets.Items {
 					g.Expect(nodeImageSet.Spec.ImagePullSecrets).To(Equal([]corev1.LocalObjectReference{{
 						Name: testImagePullSecret}}))
-					for _, imageSet := range nodeImageSet.Spec.ImageSet {
-						actualImages = append(actualImages, imageSet.Image)
-					}
+					g.Expect(nodeImageSet.Spec.ImageSet).Should(ConsistOf(testImagesList))
 				}
-				slices.Sort(actualImages)
-				g.Expect(slices.Compact(actualImages)).To(ConsistOf(testImagesList))
 				defaultPolicy, mirrorOnly := countRegistryPolicy(nodeImageSets)
-				g.Expect(defaultPolicy).To(Equal(2)) // 1 node * 2 image
-				g.Expect(mirrorOnly).To(Equal(0))    // 0 nodes * 2 image
+				g.Expect(defaultPolicy).To(Equal(1)) // 1node
+				g.Expect(mirrorOnly).To(Equal(0))    // 0node
 			}).Should(Succeed())
 
 			By("cleaning up the ImagePrefetch resource")
@@ -353,8 +347,8 @@ var _ = Describe("ImagePrefetch Controller", func() {
 				g.Expect(err).NotTo(HaveOccurred())
 				g.Expect(nodeImageSets.Items).To(HaveLen(replicas))
 				defaultPolicy, mirrorOnly := countRegistryPolicy(nodeImageSets)
-				g.Expect(defaultPolicy).To(Equal(2)) // 1node * 2image
-				g.Expect(mirrorOnly).To(Equal(0))    // 0nodes * 2image
+				g.Expect(defaultPolicy).To(Equal(1)) // 1node
+				g.Expect(mirrorOnly).To(Equal(0))    // 0node
 			}).Should(Succeed())
 
 			By("updating the replicas of ImagePrefetch resource from 1 to 4")
@@ -376,8 +370,8 @@ var _ = Describe("ImagePrefetch Controller", func() {
 				g.Expect(err).NotTo(HaveOccurred())
 				g.Expect(nodeImageSets.Items).To(HaveLen(replicas))
 				defaultPolicy, mirrorOnly := countRegistryPolicy(nodeImageSets)
-				g.Expect(defaultPolicy).To(Equal(2)) // 1node * 2image
-				g.Expect(mirrorOnly).To(Equal(6))    // 3nodes * 2image
+				g.Expect(defaultPolicy).To(Equal(1)) // 1node
+				g.Expect(mirrorOnly).To(Equal(3))    // 3node
 			}).Should(Succeed())
 
 			By("updating the replicas of ImagePrefetch resource from 4 to 2")
@@ -398,17 +392,13 @@ var _ = Describe("ImagePrefetch Controller", func() {
 				})
 				g.Expect(err).NotTo(HaveOccurred())
 				g.Expect(nodeImageSets.Items).To(HaveLen(replicas))
-				actualImages := []string{}
 				for _, nodeImageSet := range nodeImageSets.Items {
-					for _, imageSet := range nodeImageSet.Spec.ImageSet {
-						actualImages = append(actualImages, imageSet.Image)
-					}
+					g.Expect(nodeImageSet.Spec.ImageSet).Should(ConsistOf(testImagesList))
 				}
-				slices.Sort(actualImages)
-				g.Expect(slices.Compact(actualImages)).To(ConsistOf(testImagesList))
+
 				defaultPolicy, mirrorOnly := countRegistryPolicy(nodeImageSets)
-				g.Expect(defaultPolicy).To(Equal(2)) // 1 node * 2 image
-				g.Expect(mirrorOnly).To(Equal(2))    // 1 node * 2 image
+				g.Expect(defaultPolicy).To(Equal(1)) // 1node
+				g.Expect(mirrorOnly).To(Equal(1))    // 1node
 			}).Should(Succeed())
 		})
 
@@ -539,19 +529,14 @@ var _ = Describe("ImagePrefetch Controller", func() {
 				for _, nodeImageSet := range nodeImageSets.Items {
 					g.Expect(nodeImageSet.Spec.NodeName).To(SatisfyAny(Equal("worker-4"), Equal("worker-6")))
 				}
-
-				actualImages := []string{}
 				for _, nodeImageSet := range nodeImageSets.Items {
-					for _, imageSet := range nodeImageSet.Spec.ImageSet {
-						actualImages = append(actualImages, imageSet.Image)
-					}
+					g.Expect(nodeImageSet.Spec.ImageSet).Should(ConsistOf(testImagesList))
+
 				}
-				slices.Sort(actualImages)
-				g.Expect(slices.Compact(actualImages)).To(ConsistOf(testImagesList))
 
 				defaultPolicy, mirrorOnly := countRegistryPolicy(nodeImageSets)
-				g.Expect(defaultPolicy).To(Equal(2)) // 1 node * 2 image
-				g.Expect(mirrorOnly).To(Equal(2))    // 1 node * 2 image
+				g.Expect(defaultPolicy).To(Equal(1)) // 1node
+				g.Expect(mirrorOnly).To(Equal(1))    // 1node
 			}).Should(Succeed())
 		})
 
@@ -785,12 +770,10 @@ func updateNodeImage(nodeName string, images []string) {
 func countRegistryPolicy(nodeImageSets *ofenv1.NodeImageSetList) (int, int) {
 	defaultPolicy, mirrorOnly := 0, 0
 	for _, nodeImageSet := range nodeImageSets.Items {
-		for _, imageSet := range nodeImageSet.Spec.ImageSet {
-			if imageSet.RegistryPolicy == ofenv1.RegistryPolicyMirrorOnly {
-				mirrorOnly++
-			} else if imageSet.RegistryPolicy == ofenv1.RegistryPolicyDefault {
-				defaultPolicy++
-			}
+		if nodeImageSet.Spec.RegistryPolicy == ofenv1.RegistryPolicyMirrorOnly {
+			mirrorOnly++
+		} else if nodeImageSet.Spec.RegistryPolicy == ofenv1.RegistryPolicyDefault {
+			defaultPolicy++
 		}
 	}
 	return defaultPolicy, mirrorOnly

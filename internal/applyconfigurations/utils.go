@@ -16,8 +16,6 @@ import (
 func ForKind(kind schema.GroupVersionKind) interface{} {
 	switch kind {
 	// Group=ofen.cybozu.io, Version=v1
-	case v1.SchemeGroupVersion.WithKind("ImageSet"):
-		return &apiv1.ImageSetApplyConfiguration{}
 	case v1.SchemeGroupVersion.WithKind("NodeImageSet"):
 		return &apiv1.NodeImageSetApplyConfiguration{}
 	case v1.SchemeGroupVersion.WithKind("NodeImageSetSpec"):
