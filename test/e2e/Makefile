@@ -1,5 +1,6 @@
 E2ETEST_K8S_VERSION  := 1.31.6
 CERT_MANAGER_VERSION := 1.15.0
+SPEGEL_VERSION := 0.0.28
 
 PROJECT_DIR := $(CURDIR)/../../
 BIN_DIR := $(PROJECT_DIR)/bin
@@ -36,9 +37,8 @@ start:
 	$(KUBECTL) -n cert-manager wait --for=condition=available --timeout=180s --all deployments
 	$(KUBECTL) apply -k ../../config/default
 	$(KUBECTL) -n ofen-system wait --for=condition=available --timeout=180s --all deployments
-	#cloud-provider-kind > /dev/null 2>&1 &
-	# install spegel
-	helm upgrade --create-namespace --namespace spegel --install --version v0.0.28 spegel oci://ghcr.io/spegel-org/helm-charts/spegel
+	helm upgrade --create-namespace --namespace spegel --install --version v$(SPEGEL_VERSION) \
+		spegel oci://ghcr.io/spegel-org/helm-charts/spegel --wait
 
 .PHONY: test
 test:
