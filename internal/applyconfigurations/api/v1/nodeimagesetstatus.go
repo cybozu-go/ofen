@@ -3,17 +3,17 @@
 package v1
 
 import (
-	metav1 "k8s.io/client-go/applyconfigurations/meta/v1"
+	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
 // NodeImageSetStatusApplyConfiguration represents a declarative configuration of the NodeImageSetStatus type for use
 // with apply.
 type NodeImageSetStatusApplyConfiguration struct {
-	ObservedGeneration   *int64                               `json:"observedGeneration,omitempty"`
-	Conditions           []metav1.ConditionApplyConfiguration `json:"conditions,omitempty"`
-	DesiredImages        *int                                 `json:"desiredImages,omitempty"`
-	AvailableImages      *int                                 `json:"availableImages,omitempty"`
-	DownloadFailedImages *int                                 `json:"downloadFailedImages,omitempty"`
+	ObservedGeneration   *int64                           `json:"observedGeneration,omitempty"`
+	Conditions           []v1.ConditionApplyConfiguration `json:"conditions,omitempty"`
+	DesiredImages        *int                             `json:"desiredImages,omitempty"`
+	AvailableImages      *int                             `json:"availableImages,omitempty"`
+	DownloadFailedImages *int                             `json:"downloadFailedImages,omitempty"`
 }
 
 // NodeImageSetStatusApplyConfiguration constructs a declarative configuration of the NodeImageSetStatus type for use with
@@ -33,7 +33,7 @@ func (b *NodeImageSetStatusApplyConfiguration) WithObservedGeneration(value int6
 // WithConditions adds the given value to the Conditions field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Conditions field.
-func (b *NodeImageSetStatusApplyConfiguration) WithConditions(values ...*metav1.ConditionApplyConfiguration) *NodeImageSetStatusApplyConfiguration {
+func (b *NodeImageSetStatusApplyConfiguration) WithConditions(values ...*v1.ConditionApplyConfiguration) *NodeImageSetStatusApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithConditions")

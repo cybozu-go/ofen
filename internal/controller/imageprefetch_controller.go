@@ -243,11 +243,11 @@ func (r *ImagePrefetchReconciler) createOrUpdateNodeImageSet(ctx context.Context
 		if i < r.ImagePullNodeLimit {
 			registryPolicy = ofenv1.RegistryPolicyDefault
 		}
-		imageSet := createImageSet(imgPrefetch, registryPolicy)
 		nodeImageSet := ofenv1apply.NodeImageSet(nodeImageSetName).
 			WithLabels(labelSet(imgPrefetch, nodeName)).
 			WithSpec(ofenv1apply.NodeImageSetSpec().
-				WithImageSet(imageSet...).
+				WithImageSet(imgPrefetch.Spec.Images...).
+				WithRegistryPolicy(registryPolicy).
 				WithNodeName(nodeName).
 				WithImagePullSecrets(imgPrefetch.Spec.ImagePullSecrets...),
 			)
@@ -325,16 +325,6 @@ func getNodeImageSetName(imgPrefetch *ofenv1.ImagePrefetch, nodeName string) str
 	io.WriteString(sha1, name+"-"+namespace+"-"+nodeName)
 	hash := hex.EncodeToString(sha1.Sum(nil))
 	return fmt.Sprintf("%s-%s-%s", constants.NodeImageSetPrefix, name, hash[:8])
-}
-
-func createImageSet(imgPrefetch *ofenv1.ImagePrefetch, registryPolicy ofenv1.RegistryPolicy) []*ofenv1apply.ImageSetApplyConfiguration {
-	imageSets := []*ofenv1apply.ImageSetApplyConfiguration{}
-	for _, image := range imgPrefetch.Spec.Images {
-		imageSets = append(imageSets, ofenv1apply.ImageSet().WithImage(image).
-			WithRegistryPolicy(registryPolicy))
-	}
-
-	return imageSets
 }
 
 func (r *ImagePrefetchReconciler) updateStatus(ctx context.Context, imgPrefetch *ofenv1.ImagePrefetch, selectedNodes []string) (ctrl.Result, error) {

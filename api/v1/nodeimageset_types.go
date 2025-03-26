@@ -8,7 +8,10 @@ import (
 // NodeImageSetSpec defines the desired state of NodeImageSet
 type NodeImageSetSpec struct {
 	// ImageSet is a list of image sets to be downloaded.
-	ImageSet []ImageSet `json:"imageSet"`
+	ImageSet []string `json:"imageSet"`
+
+	// Registry Policy is the policy for downloading images from the registry.
+	RegistryPolicy RegistryPolicy `json:"registryPolicy"`
 
 	// NodeName is the name of the node where the image is downloaded.
 	NodeName string `json:"nodeName"`
@@ -21,14 +24,6 @@ type NodeImageSetSpec struct {
 	// +optional
 	// +kubebuilder:default:=3
 	ImageDownloadRetryLimit int32 `json:"imageDownloadRetryLimit,omitempty"`
-}
-
-type ImageSet struct {
-	// image is the name of the image.
-	Image string `json:"image"`
-
-	// Registry Policy is the policy for downloading images from the registry.
-	RegistryPolicy RegistryPolicy `json:"registryPolicy"`
 }
 
 type RegistryPolicy string
