@@ -77,13 +77,7 @@ func (in *ImagePrefetchSpec) DeepCopyInto(out *ImagePrefetchSpec) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
-	if in.NodeSelector != nil {
-		in, out := &in.NodeSelector, &out.NodeSelector
-		*out = make(map[string]string, len(*in))
-		for key, val := range *in {
-			(*out)[key] = val
-		}
-	}
+	in.NodeSelector.DeepCopyInto(&out.NodeSelector)
 	if in.ImagePullSecrets != nil {
 		in, out := &in.ImagePullSecrets, &out.ImagePullSecrets
 		*out = make([]corev1.LocalObjectReference, len(*in))

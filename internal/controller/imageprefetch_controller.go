@@ -30,6 +30,7 @@ import (
 	ofenv1 "github.com/cybozu-go/ofen/api/v1"
 	ofenv1apply "github.com/cybozu-go/ofen/internal/applyconfigurations/api/v1"
 	"github.com/cybozu-go/ofen/internal/constants"
+	"github.com/cybozu-go/ofen/internal/util"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -78,7 +79,7 @@ func (r *ImagePrefetchReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		}
 	}
 
-	if imgPrefetch.Spec.NodeSelector == nil && imgPrefetch.Spec.Replicas == 0 {
+	if util.IsLabelSelectorEmpty(&imgPrefetch.Spec.NodeSelector) && imgPrefetch.Spec.Replicas == 0 {
 		return ctrl.Result{}, fmt.Errorf("NodeSelector or Replicas must be specified")
 	}
 
@@ -124,7 +125,7 @@ func (r *ImagePrefetchReconciler) finalize(ctx context.Context, imgPrefetch *ofe
 func (r *ImagePrefetchReconciler) selectTargetNodes(ctx context.Context, imgPrefetch *ofenv1.ImagePrefetch) ([]string, error) {
 	logger := log.FromContext(ctx)
 	// If NodeSelector is specified, select nodes by NodeSelector
-	if imgPrefetch.Spec.NodeSelector != nil {
+	if !util.IsLabelSelectorEmpty(&imgPrefetch.Spec.NodeSelector) {
 		nodes, err := r.selectNodesBySelector(ctx, imgPrefetch.Spec.NodeSelector)
 		if err != nil {
 			return nil, err
@@ -158,12 +159,16 @@ func (r *ImagePrefetchReconciler) selectTargetNodes(ctx context.Context, imgPref
 	return nil, fmt.Errorf("failed to select target nodes")
 }
 
-func (r *ImagePrefetchReconciler) selectNodesBySelector(ctx context.Context, nodeSelector map[string]string) ([]corev1.Node, error) {
+func (r *ImagePrefetchReconciler) selectNodesBySelector(ctx context.Context, nodeSelector metav1.LabelSelector) ([]corev1.Node, error) {
+	selector, err := metav1.LabelSelectorAsSelector(&nodeSelector)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse selector: %w", err)
+	}
+
 	nodes := &corev1.NodeList{}
-	if err := r.List(ctx, nodes, &client.ListOptions{
-		LabelSelector: labels.SelectorFromSet(
-			nodeSelector,
-		)}); err != nil {
+	if err := r.List(ctx, nodes, &client.MatchingLabelsSelector{
+		Selector: selector,
+	}); err != nil {
 
 		return nil, err
 	}
@@ -450,20 +455,23 @@ func (r *ImagePrefetchReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 			var requests []ctrl.Request
 			for _, imgPrefetch := range imagePrefetchList.Items {
-				if imgPrefetch.Spec.NodeSelector == nil {
+				if util.IsLabelSelectorEmpty(&imgPrefetch.Spec.NodeSelector) {
+					continue
+				}
+				selector, err := metav1.LabelSelectorAsSelector(&imgPrefetch.Spec.NodeSelector)
+				if err != nil {
 					continue
 				}
 
-				for key, value := range imgPrefetch.Spec.NodeSelector {
-					if node.Labels[key] == value {
-						requests = append(requests, ctrl.Request{
-							NamespacedName: types.NamespacedName{
-								Namespace: imgPrefetch.Namespace,
-								Name:      imgPrefetch.Name,
-							},
-						})
-					}
+				if selector.Matches(labels.Set(node.Labels)) {
+					requests = append(requests, ctrl.Request{
+						NamespacedName: types.NamespacedName{
+							Namespace: imgPrefetch.Namespace,
+							Name:      imgPrefetch.Name,
+						},
+					})
 				}
+
 			}
 
 			return requests

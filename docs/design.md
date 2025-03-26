@@ -156,7 +156,7 @@ ImagePrefetch Resource
 | Field            | Type                          | Required | Description                                                |
 | ---------------- | ----------------------------- | -------- | ---------------------------------------------------------- |
 | images           | []string                      | true     | List of images to pre-download                             |
-| nodeSelector     | map[string]string             | false    | Specify the nodes to which the image should be downloaded  |
+| nodeSelector     | metav1.LabelSelector          | false    | Specify the nodes to which the image should be downloaded  |
 | replicas         | int                           | false    | Set the number of image download nodes                     |
 | imagePullSecrets | []corev1.LocalObjectReference | false    | Secret used for authentication with the container registry |
 
