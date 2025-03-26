@@ -1,12 +1,14 @@
 E2ETEST_K8S_VERSION  := 1.31.6
 CERT_MANAGER_VERSION := 1.15.0
 SPEGEL_VERSION := 0.0.28
+KIND_VERSION := 0.27.0
 
 PROJECT_DIR := $(CURDIR)/../../
 BIN_DIR := $(PROJECT_DIR)/bin
 
 CURL := curl -sSLf
 KUBECTL := $(BIN_DIR)/kubectl
+KIND := $(BIN_DIR)/kind
 
 KIND_CLUSTER_NAME := ofen
 KIND_CONFIG := kind-config.yaml
@@ -26,13 +28,13 @@ help:
 setup:
 	mkdir -p $(BIN_DIR)
 	$(CURL) -o  $(BIN_DIR)/kubectl https://dl.k8s.io/release/v$(E2ETEST_K8S_VERSION)/bin/linux/amd64/kubectl && chmod a+x $(BIN_DIR)/kubectl
-	GOBIN=$(BIN_DIR) go install sigs.k8s.io/kind@latest
+	GOBIN=$(BIN_DIR) go install sigs.k8s.io/kind@v$(KIND_VERSION)
 
 .PHONY: start
 start:
 	$(MAKE) -C ../../ docker-build
-	kind create cluster --name=$(KIND_CLUSTER_NAME) --config=$(KIND_CONFIG) --image=kindest/node:v$(E2ETEST_K8S_VERSION) --wait 1m
-	kind load docker-image image-prefetch:dev --name=$(KIND_CLUSTER_NAME)
+	$(KIND) create cluster --name=$(KIND_CLUSTER_NAME) --config=$(KIND_CONFIG) --image=kindest/node:v$(E2ETEST_K8S_VERSION) --wait 1m
+	$(KIND) load docker-image image-prefetch:dev --name=$(KIND_CLUSTER_NAME)
 	$(KUBECTL) apply -f https://github.com/jetstack/cert-manager/releases/download/v$(CERT_MANAGER_VERSION)/cert-manager.yaml
 	$(KUBECTL) -n cert-manager wait --for=condition=available --timeout=180s --all deployments
 	$(KUBECTL) apply -k ../../config/default
@@ -48,13 +50,13 @@ test:
 .PHONY: logs
 logs:
 	rm -rf logs.tar.gz logs
-	kind export logs --name=$(KIND_CLUSTER_NAME) ./logs
+	$(KIND) export logs --name=$(KIND_CLUSTER_NAME) ./logs
 	tar czf logs.tar.gz logs
 	rm -rf logs
 
 .PHONY: stop
 stop:
-	kind delete cluster --name=$(KIND_CLUSTER_NAME)
+	$(KIND) delete cluster --name=$(KIND_CLUSTER_NAME)
 	-docker image rm prefetch:dev
 	-docker image prune -f
 	-pgrep -f cloud-provider-kind | xargs kill 
