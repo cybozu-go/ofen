@@ -644,6 +644,64 @@ var _ = Describe("ImagePrefetch Controller", func() {
 				g.Expect(len(nodeImageSets.Items)).To(Equal(2))
 			}).Should(Succeed())
 		})
+
+		It("should recreate NodeImageSets on another node when a node is NotReady", func() {
+			By("creating ImagePrefetch with replicas")
+			testName := "not-ready-node"
+			createNamespace(testName)
+			createNewImagePrefetch(testName,
+				ofenv1.ImagePrefetchSpec{
+					Images:   testImagesList,
+					Replicas: 2,
+				},
+			)
+			Eventually(func(g Gomega) {
+				nodeImageSets := &ofenv1.NodeImageSetList{}
+				err := k8sClient.List(ctx, nodeImageSets, &client.ListOptions{
+					LabelSelector: labels.SelectorFromSet(map[string]string{
+						constants.OwnerImagePrefetchNamespace: testName,
+					}),
+				})
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(len(nodeImageSets.Items)).To(Equal(2))
+			}).Should(Succeed())
+
+			By("updating a node to NotReady")
+			nodeImageSets := &ofenv1.NodeImageSetList{}
+			err := k8sClient.List(ctx, nodeImageSets, &client.ListOptions{
+				LabelSelector: labels.SelectorFromSet(map[string]string{
+					constants.OwnerImagePrefetchNamespace: testName,
+				}),
+			})
+			Expect(err).NotTo(HaveOccurred())
+			nodeName := nodeImageSets.Items[0].Spec.NodeName
+			node := &corev1.Node{}
+			err = k8sClient.Get(ctx, client.ObjectKey{Name: nodeName}, node)
+			Expect(err).NotTo(HaveOccurred())
+			node.Status.Conditions = []corev1.NodeCondition{
+				{
+					Type:   corev1.NodeReady,
+					Status: corev1.ConditionFalse,
+				},
+			}
+			err = k8sClient.Status().Update(ctx, node)
+			Expect(err).NotTo(HaveOccurred())
+
+			By("checking NodeImageSets are recreated on another node")
+			Eventually(func(g Gomega) {
+				nodeImageSets := &ofenv1.NodeImageSetList{}
+				err := k8sClient.List(ctx, nodeImageSets, &client.ListOptions{
+					LabelSelector: labels.SelectorFromSet(map[string]string{
+						constants.OwnerImagePrefetchNamespace: testName,
+					}),
+				})
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(len(nodeImageSets.Items)).To(Equal(2))
+				for _, nodeImageSet := range nodeImageSets.Items {
+					g.Expect(nodeImageSet.Spec.NodeName).NotTo(Equal(nodeName))
+				}
+			}).Should(Succeed())
+		})
 	})
 })
 
