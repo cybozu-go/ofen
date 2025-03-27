@@ -35,10 +35,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-const (
-	fieldManager = "ofen.cybozu.io"
-)
-
 // ImagePrefetchReconciler reconciles a ImagePrefetch object
 type ImagePrefetchReconciler struct {
 	client.Client
@@ -301,7 +297,7 @@ func (r *ImagePrefetchReconciler) applyNodeImageSet(ctx context.Context, nodeIma
 		return fmt.Errorf("failed to get NodeImageSet: %w", err)
 	}
 
-	currentApplyConfig, err := ofenv1apply.ExtractNodeImageSet(&current, fieldManager)
+	currentApplyConfig, err := ofenv1apply.ExtractNodeImageSet(&current, constants.ImagePrefetchFieldManager)
 	if err != nil {
 		return fmt.Errorf("failed to extract NodeImageSet: %w", err)
 	}
@@ -310,7 +306,7 @@ func (r *ImagePrefetchReconciler) applyNodeImageSet(ctx context.Context, nodeIma
 	}
 
 	return r.Patch(ctx, patch, client.Apply, &client.PatchOptions{
-		FieldManager: fieldManager,
+		FieldManager: constants.ImagePrefetchFieldManager,
 		Force:        ptr.To(true),
 	})
 }
