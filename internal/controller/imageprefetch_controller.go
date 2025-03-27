@@ -144,16 +144,10 @@ func (r *ImagePrefetchReconciler) selectTargetNodes(ctx context.Context, imgPref
 			return nil, err
 		}
 
-		availableNodes := []string{}
-		for _, node := range allNodes.Items {
-			if util.IsNodeReady(&node) {
-				availableNodes = append(availableNodes, node.Name)
-			}
-		}
-
-		needsNodeSelection := isNeedNodeSelection(imgPrefetch, availableNodes)
+		readyNodes := filterReadyNodes(allNodes.Items)
+		needsNodeSelection := isNeedNodeSelection(imgPrefetch, readyNodes)
 		if needsNodeSelection {
-			nodes := selectNodesByReplicas(ctx, allNodes.Items, imgPrefetch.Spec.Replicas)
+			nodes := selectNodesByReplicas(ctx, readyNodes, imgPrefetch.Spec.Replicas)
 			logger.Info("selected nodes", "nodes", getNodeNames(nodes))
 
 			return getNodeNames(nodes), nil
@@ -175,18 +169,28 @@ func (r *ImagePrefetchReconciler) selectNodesBySelector(ctx context.Context, nod
 	if err := r.List(ctx, nodes, &client.MatchingLabelsSelector{
 		Selector: selector,
 	}); err != nil {
-
 		return nil, err
 	}
-	sort.Slice(nodes.Items, func(i, j int) bool {
-		return len(nodes.Items[i].Status.Images) < len(nodes.Items[j].Status.Images)
+
+	readyNodes := filterReadyNodes(nodes.Items)
+	sort.Slice(readyNodes, func(i, j int) bool {
+		return len(readyNodes[i].Status.Images) < len(readyNodes[j].Status.Images)
 	})
 
-	return nodes.Items, nil
-
+	return readyNodes, nil
 }
 
-func isNeedNodeSelection(imgPrefetch *ofenv1.ImagePrefetch, availableNodes []string) bool {
+func filterReadyNodes(nodes []corev1.Node) []corev1.Node {
+	var readyNodes []corev1.Node
+	for _, node := range nodes {
+		if util.IsNodeReady(&node) {
+			readyNodes = append(readyNodes, node)
+		}
+	}
+	return readyNodes
+}
+
+func isNeedNodeSelection(imgPrefetch *ofenv1.ImagePrefetch, readyNodes []corev1.Node) bool {
 	if len(imgPrefetch.Status.SelectedNodes) == 0 {
 		return true
 	}
@@ -195,15 +199,16 @@ func isNeedNodeSelection(imgPrefetch *ofenv1.ImagePrefetch, availableNodes []str
 		return true
 	}
 
-	stillNodeExists := true
+	readyNodeList := getNodeNames(readyNodes)
+	stillNodeReady := true
 	for _, node := range imgPrefetch.Status.SelectedNodes {
-		if !slices.Contains(availableNodes, node) {
-			stillNodeExists = false
+		if !slices.Contains(readyNodeList, node) {
+			stillNodeReady = false
 			break
 		}
 	}
 
-	return !stillNodeExists
+	return !stillNodeReady
 }
 
 func getNodeNames(nodes []corev1.Node) []string {
