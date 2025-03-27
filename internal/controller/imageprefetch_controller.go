@@ -323,7 +323,7 @@ func getNodeImageSetName(imgPrefetch *ofenv1.ImagePrefetch, nodeName string) str
 	name := imgPrefetch.Name
 	namespace := imgPrefetch.Namespace
 	sha1 := sha1.New()
-	io.WriteString(sha1, name+"-"+namespace+"-"+nodeName)
+	io.WriteString(sha1, name+"\000"+namespace+"\000"+nodeName)
 	hash := hex.EncodeToString(sha1.Sum(nil))
 	return fmt.Sprintf("%s-%s-%s", constants.NodeImageSetPrefix, name, hash[:8])
 }
