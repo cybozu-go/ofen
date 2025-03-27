@@ -70,7 +70,7 @@ lint-fix: golangci-lint ## Run golangci-lint linter and perform fixes
 	$(GOLANGCI_LINT) run --fix
 
 .PHONY: build
-build: manifests generate fmt vet ## Build manager binary.
+build: manifests generate fmt vet k8s-client-gen ## Build manager binary.
 	go build -o bin/manager cmd/main.go
 
 .PHONY: run
