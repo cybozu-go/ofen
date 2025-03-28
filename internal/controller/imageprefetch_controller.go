@@ -99,19 +99,17 @@ func (r *ImagePrefetchReconciler) finalize(ctx context.Context, imgPrefetch *ofe
 	}
 
 	// Delete nodeImageSets
-	nodeImageSets := &ofenv1.NodeImageSetList{}
-	if err := r.List(ctx, nodeImageSets, client.MatchingLabels(map[string]string{
-		constants.OwnerImagePrefetchNamespace: imgPrefetch.Namespace,
-		constants.OwnerImagePrefetchName:      imgPrefetch.Name,
-	})); err != nil {
-		return fmt.Errorf("failed to list NodeImageSets: %w", err)
-	}
-
 	logger.Info("deleting NodeImageSets")
-	for _, nodeImageSet := range nodeImageSets.Items {
-		if err := r.Delete(ctx, &nodeImageSet); err != nil {
-			return fmt.Errorf("failed to delete NodeImageSet: %w", err)
-		}
+
+	opts := []client.DeleteAllOfOption{
+		client.MatchingLabels{
+			constants.OwnerImagePrefetchNamespace: imgPrefetch.Namespace,
+			constants.OwnerImagePrefetchName:      imgPrefetch.Name,
+		},
+	}
+	err := r.DeleteAllOf(ctx, &ofenv1.NodeImageSet{}, opts...)
+	if err != nil {
+		return fmt.Errorf("failed to delete NodeImageSets: %w", err)
 	}
 
 	controllerutil.RemoveFinalizer(imgPrefetch, constants.ImagePrefetchFinalizer)
