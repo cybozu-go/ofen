@@ -331,6 +331,7 @@ func getNodeImageSetName(imgPrefetch *ofenv1.ImagePrefetch, nodeName string) str
 func (r *ImagePrefetchReconciler) updateStatus(ctx context.Context, imgPrefetch *ofenv1.ImagePrefetch, selectedNodes []string) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 	imgPrefetch.Status.ObservedGeneration = imgPrefetch.Generation
+	sort.Strings(selectedNodes)
 	imgPrefetch.Status.SelectedNodes = selectedNodes
 	meta.SetStatusCondition(&imgPrefetch.Status.Conditions, metav1.Condition{
 		Type:    ofenv1.ConditionReady,
