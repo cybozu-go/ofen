@@ -118,6 +118,44 @@ var _ = Describe("ImagePrefetch Controller", func() {
 			deleteImagePrefetchResource(imagePrefetch)
 		})
 
+		It("Should delete NodeImageSets when the ImagePrefetch resource is deleted", func() {
+			By("creating a new ImagePrefetch with replicas")
+
+			testName := "confirm-delete-node-image-set"
+			replicas := 4
+			createNamespace(testName)
+			imagePrefetch := createNewImagePrefetch(testName, ofenv1.ImagePrefetchSpec{
+				Images:   testImagesList,
+				Replicas: replicas,
+			})
+
+			Eventually(func(g Gomega) {
+				nodeImageSets := &ofenv1.NodeImageSetList{}
+				err := k8sClient.List(ctx, nodeImageSets, &client.ListOptions{
+					LabelSelector: labels.SelectorFromSet(map[string]string{
+						constants.OwnerImagePrefetchNamespace: testName,
+					}),
+				})
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(nodeImageSets.Items).To(HaveLen(replicas))
+			}).Should(Succeed())
+
+			By("deleting the ImagePrefetch resource")
+			deleteImagePrefetchResource(imagePrefetch)
+
+			By("checking NodeImageSets are deleted")
+			Eventually(func(g Gomega) {
+				nodeImageSets := &ofenv1.NodeImageSetList{}
+				err := k8sClient.List(ctx, nodeImageSets, &client.ListOptions{
+					LabelSelector: labels.SelectorFromSet(map[string]string{
+						constants.OwnerImagePrefetchNamespace: testName,
+					}),
+				})
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(nodeImageSets.Items).To(HaveLen(0))
+			}).Should(Succeed())
+		})
+
 		It("Should match node names in NodeImageSets with those in ImagePrefetch Status SelectedNodes", func() {
 			By("creating a new ImagePrefetch with replicas")
 			testName := "image-prefetch-status"
