@@ -447,20 +447,12 @@ func (r *ImagePrefetchReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	nodeImageSetHandler := handler.EnqueueRequestsFromMapFunc(
 		func(ctx context.Context, obj client.Object) []ctrl.Request {
 			nodeImageSet := obj.(*ofenv1.NodeImageSet)
-			imagePrefetch := &ofenv1.ImagePrefetch{}
-			err := r.Get(ctx, types.NamespacedName{
-				Namespace: nodeImageSet.Labels[constants.OwnerImagePrefetchNamespace],
-				Name:      nodeImageSet.Labels[constants.OwnerImagePrefetchName],
-			}, imagePrefetch)
-			if err != nil {
-				return nil
-			}
 
 			return []ctrl.Request{
 				{
 					NamespacedName: types.NamespacedName{
-						Namespace: imagePrefetch.Namespace,
-						Name:      imagePrefetch.Name,
+						Namespace: nodeImageSet.Labels[constants.OwnerImagePrefetchNamespace],
+						Name:      nodeImageSet.Labels[constants.OwnerImagePrefetchName],
 					},
 				},
 			}
