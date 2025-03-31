@@ -14,7 +14,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
@@ -469,15 +468,7 @@ func (r *ImagePrefetchReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 			var requests []ctrl.Request
 			for _, imgPrefetch := range imagePrefetchList.Items {
-				if util.IsLabelSelectorEmpty(&imgPrefetch.Spec.NodeSelector) {
-					continue
-				}
-				selector, err := metav1.LabelSelectorAsSelector(&imgPrefetch.Spec.NodeSelector)
-				if err != nil {
-					continue
-				}
-
-				if selector.Matches(labels.Set(node.Labels)) {
+				if slices.Contains(imgPrefetch.Status.SelectedNodes, node.Name) {
 					requests = append(requests, ctrl.Request{
 						NamespacedName: types.NamespacedName{
 							Namespace: imgPrefetch.Namespace,
@@ -485,7 +476,6 @@ func (r *ImagePrefetchReconciler) SetupWithManager(mgr ctrl.Manager) error {
 						},
 					})
 				}
-
 			}
 
 			return requests
