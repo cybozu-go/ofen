@@ -499,7 +499,7 @@ func (r *ImagePrefetchReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			builder.WithPredicates(
 				predicate.Funcs{
 					CreateFunc: func(e event.CreateEvent) bool {
-						return true
+						return false
 					},
 					UpdateFunc: func(e event.UpdateEvent) bool {
 						return true
