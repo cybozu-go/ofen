@@ -133,14 +133,16 @@ func (r *ImagePrefetchReconciler) selectTargetNodes(ctx context.Context, imgPref
 	}
 
 	if imgPrefetch.Spec.Replicas > 0 {
-		readyNodes, err := r.getReadyNodes(ctx)
+		needsNodeSelection, err := r.isNeedNodeSelection(ctx, imgPrefetch)
 		if err != nil {
 			return nil, err
 		}
 
-		needsNodeSelection := isNeedNodeSelection(imgPrefetch, readyNodes)
 		if needsNodeSelection {
-			nodes := selectNodesByReplicas(imgPrefetch, readyNodes)
+			nodes, err := r.selectNodesByReplicas(ctx, imgPrefetch)
+			if err != nil {
+				return nil, fmt.Errorf("failed to select nodes by replicas: %w", err)
+			}
 			logger.Info("selected nodes", "nodes", nodes)
 
 			return nodes, nil
@@ -150,14 +152,6 @@ func (r *ImagePrefetchReconciler) selectTargetNodes(ctx context.Context, imgPref
 	}
 
 	return nil, fmt.Errorf("failed to select target nodes")
-}
-
-func (r *ImagePrefetchReconciler) getReadyNodes(ctx context.Context) ([]corev1.Node, error) {
-	allNodes := &corev1.NodeList{}
-	if err := r.List(ctx, allNodes); err != nil {
-		return nil, err
-	}
-	return filterReadyNodes(allNodes.Items), nil
 }
 
 func (r *ImagePrefetchReconciler) selectNodesBySelector(ctx context.Context, nodeSelector metav1.LabelSelector) ([]corev1.Node, error) {
@@ -191,15 +185,21 @@ func filterReadyNodes(nodes []corev1.Node) []corev1.Node {
 	return readyNodes
 }
 
-func isNeedNodeSelection(imgPrefetch *ofenv1.ImagePrefetch, readyNodes []corev1.Node) bool {
+func (r *ImagePrefetchReconciler) isNeedNodeSelection(ctx context.Context, imgPrefetch *ofenv1.ImagePrefetch) (bool, error) {
 	if len(imgPrefetch.Status.SelectedNodes) == 0 {
-		return true
+		return true, nil
 	}
 
 	if imgPrefetch.Generation != imgPrefetch.Status.ObservedGeneration {
-		return true
+		return true, nil
 	}
 
+	allNodes := &corev1.NodeList{}
+	if err := r.List(ctx, allNodes); err != nil {
+		return false, err
+	}
+
+	readyNodes := filterReadyNodes(allNodes.Items)
 	readyNodesName := getNodeNames(readyNodes)
 	containUnhealthyNodes := false
 	for _, node := range imgPrefetch.Status.SelectedNodes {
@@ -209,7 +209,7 @@ func isNeedNodeSelection(imgPrefetch *ofenv1.ImagePrefetch, readyNodes []corev1.
 		}
 	}
 
-	return containUnhealthyNodes
+	return containUnhealthyNodes, nil
 }
 
 func getNodeNames(nodes []corev1.Node) []string {
@@ -221,10 +221,16 @@ func getNodeNames(nodes []corev1.Node) []string {
 	return nodeNames
 }
 
-func selectNodesByReplicas(imgPrefetch *ofenv1.ImagePrefetch, readyNodes []corev1.Node) []string {
+func (r *ImagePrefetchReconciler) selectNodesByReplicas(ctx context.Context, imgPrefetch *ofenv1.ImagePrefetch) ([]string, error) {
 	var selectNodes []string
 	targetReplicas := imgPrefetch.Spec.Replicas
 
+	allNodes := &corev1.NodeList{}
+	if err := r.List(ctx, allNodes); err != nil {
+		return nil, err
+	}
+
+	readyNodes := filterReadyNodes(allNodes.Items)
 	readyNodesName := getNodeNames(readyNodes)
 	for _, node := range imgPrefetch.Status.SelectedNodes {
 		if len(selectNodes) >= targetReplicas {
@@ -252,7 +258,7 @@ func selectNodesByReplicas(imgPrefetch *ofenv1.ImagePrefetch, readyNodes []corev
 		}
 	}
 
-	return selectNodes
+	return selectNodes, nil
 }
 
 func (r *ImagePrefetchReconciler) createOrUpdateNodeImageSet(ctx context.Context, imgPrefetch *ofenv1.ImagePrefetch, selectedNodes []string) error {
