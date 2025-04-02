@@ -156,7 +156,7 @@ ImagePrefetch Resource
 | Field            | Type                          | Required | Description                                                |
 | ---------------- | ----------------------------- | -------- | ---------------------------------------------------------- |
 | images           | []string                      | true     | List of images to pre-download                             |
-| nodeSelector     | map[string]string             | false    | Specify the nodes to which the image should be downloaded  |
+| nodeSelector     | metav1.LabelSelector          | false    | Specify the nodes to which the image should be downloaded  |
 | replicas         | int                           | false    | Set the number of image download nodes                     |
 | imagePullSecrets | []corev1.LocalObjectReference | false    | Secret used for authentication with the container registry |
 
@@ -173,13 +173,13 @@ spec:
 ```
 
 NodeImageSet Resource
-| Field                   | Type       | Required | Description                                                    |
-| ----------------------- | ---------- | -------- | -------------------------------------------------------------- |
-| imageSet                | []ImageSet | true     | Copy of the images specified in ImagePrefetch's `.spec.Images` |
-| registryPolicy          | string     | true     | Registry to use when downloading images                        |
-| imagePullSecrets        | []string   | false    | Copy of the ImagePrefetch's `.spec.imagePullSecrets`           |
-| nodeName                | string     | true     | Node to download images to                                     |
-| imageDownloadRetryLimit | int        | false    | Number of retries to download images                           |
+| Field                   | Type     | Required | Description                                                    |
+| ----------------------- | -------- | -------- | -------------------------------------------------------------- |
+| imageSet                | []string | true     | Copy of the images specified in ImagePrefetch's `.spec.Images` |
+| registryPolicy          | string   | true     | Registry to use when downloading images                        |
+| imagePullSecrets        | []string | false    | Copy of the ImagePrefetch's `.spec.imagePullSecrets`           |
+| nodeName                | string   | true     | Node to download images to                                     |
+| imageDownloadRetryLimit | int      | false    | Number of retries to download images                           |
 
 ```
 kind: NodeImageSet
@@ -187,8 +187,8 @@ metadata:
   name: worker1
 spec:
   imageSet:
-  - name: ghcr.io/cybozu/ubuntu:24.04
-    registryPolicy: Default
+  - ghcr.io/cybozu/ubuntu:24.04
+  registryPolicy: Default
   imagePullSecrets:
   - name: regcred
   nodeName: worker1

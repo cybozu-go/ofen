@@ -36,16 +36,15 @@ var _ = Describe("NodeImageSet Controller", func() {
 						Namespace: "default",
 					},
 					Spec: ofenv1.NodeImageSetSpec{
-						ImageSet: []ofenv1.ImageSet{
-							{
-								Image:          "test-image",
-								RegistryPolicy: ofenv1.RegistryPolicyDefault,
-							},
+						ImageSet: []string{
+							"test-image",
 						},
-						NodeName: "test-node",
+						RegistryPolicy: ofenv1.RegistryPolicyDefault,
+						NodeName:       "test-node",
 					},
 					// TODO(user): Specify other spec details if needed.
 				}
+
 				Expect(k8sClient.Create(ctx, resource)).To(Succeed())
 			}
 		})
