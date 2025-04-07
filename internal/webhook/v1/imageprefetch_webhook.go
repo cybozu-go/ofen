@@ -6,11 +6,14 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	ofenv1 "github.com/cybozu-go/ofen/api/v1"
+	"github.com/cybozu-go/ofen/internal/constants"
+	"github.com/cybozu-go/ofen/internal/util"
 )
 
 // log is for logging in this package.
@@ -25,7 +28,7 @@ func SetupImagePrefetchWebhookWithManager(mgr ctrl.Manager) error {
 		Complete()
 }
 
-// +kubebuilder:webhook:path=/mutate-ofen-cybozu-io-v1-imageprefetch,mutating=true,failurePolicy=fail,sideEffects=None,groups=ofen.cybozu.io,resources=imageprefetches,verbs=create;update,versions=v1,name=mimageprefetch.kb.io,admissionReviewVersions=v1
+// +kubebuilder:webhook:path=/mutate-ofen-cybozu-io-v1-imageprefetch,mutating=true,failurePolicy=fail,sideEffects=None,groups=ofen.cybozu.io,resources=imageprefetches,verbs=create,versions=v1,name=mimageprefetch.kb.io,admissionReviewVersions=v1
 
 type ImagePrefetchCustomDefaulter struct {
 	// TODO(user): Add more fields as needed for defaulting
@@ -35,14 +38,13 @@ var _ webhook.CustomDefaulter = &ImagePrefetchCustomDefaulter{}
 
 // Default implements webhook.CustomDefaulter so a webhook will be registered for the Kind ImagePrefetch.
 func (d *ImagePrefetchCustomDefaulter) Default(ctx context.Context, obj runtime.Object) error {
-	imageprefetch, ok := obj.(*ofenv1.ImagePrefetch)
+	imageprefetch := obj.(*ofenv1.ImagePrefetch)
 
-	if !ok {
-		return fmt.Errorf("expected an ImagePrefetch object but got %T", obj)
+	controllerutil.AddFinalizer(imageprefetch, constants.ImagePrefetchFinalizer)
+
+	if util.IsLabelSelectorEmpty(&imageprefetch.Spec.NodeSelector) && imageprefetch.Spec.Replicas == 0 {
+		imageprefetch.Spec.Replicas = constants.DefaultImagePrefetchReplicas
 	}
-	imageprefetchlog.Info("Defaulting for ImagePrefetch", "name", imageprefetch.GetName())
-
-	// TODO(user): fill in your defaulting logic.
 
 	return nil
 }
@@ -77,7 +79,8 @@ func (v *ImagePrefetchCustomValidator) ValidateUpdate(ctx context.Context, oldOb
 	if !ok {
 		return nil, fmt.Errorf("expected a ImagePrefetch object for the newObj but got %T", newObj)
 	}
-	imageprefetchlog.Info("Validation for ImagePrefetch upon update", "name", imageprefetch.GetName())
+	imageprefetchlog.Info("Validation for ImagePrefetch upon update", "name", imageprefetch.GetName(),
+		"finalizers", imageprefetch.Finalizers)
 
 	// TODO(user): fill in your validation logic upon object update.
 
