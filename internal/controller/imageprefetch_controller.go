@@ -97,7 +97,6 @@ func (r *ImagePrefetchReconciler) finalize(ctx context.Context, imgPrefetch *ofe
 		return nil
 	}
 
-	// Delete nodeImageSets
 	logger.Info("deleting NodeImageSets")
 
 	opts := []client.DeleteAllOfOption{
