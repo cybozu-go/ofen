@@ -276,7 +276,7 @@ func (r *ImagePrefetchReconciler) createOrUpdateNodeImageSet(ctx context.Context
 		nodeImageSet := ofenv1apply.NodeImageSet(nodeImageSetName).
 			WithLabels(labelSet(imgPrefetch, nodeName)).
 			WithSpec(ofenv1apply.NodeImageSetSpec().
-				WithImageSet(imgPrefetch.Spec.Images...).
+				WithImages(imgPrefetch.Spec.Images...).
 				WithRegistryPolicy(registryPolicy).
 				WithNodeName(nodeName).
 				WithImagePullSecrets(imgPrefetch.Spec.ImagePullSecrets...),

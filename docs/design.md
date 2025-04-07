@@ -175,7 +175,7 @@ spec:
 NodeImageSet Resource
 | Field                   | Type     | Required | Description                                                    |
 | ----------------------- | -------- | -------- | -------------------------------------------------------------- |
-| imageSet                | []string | true     | Copy of the images specified in ImagePrefetch's `.spec.Images` |
+| images                  | []string | true     | Copy of the images specified in ImagePrefetch's `.spec.Images` |
 | registryPolicy          | string   | true     | Registry to use when downloading images                        |
 | imagePullSecrets        | []string | false    | Copy of the ImagePrefetch's `.spec.imagePullSecrets`           |
 | nodeName                | string   | true     | Node to download images to                                     |
@@ -186,11 +186,11 @@ kind: NodeImageSet
 metadata:
   name: worker1
 spec:
-  imageSet:
-  - ghcr.io/cybozu/ubuntu:24.04
+  images:
+    - ghcr.io/cybozu/ubuntu:24.04
   registryPolicy: Default
   imagePullSecrets:
-  - name: regcred
+    - name: regcred
   nodeName: worker1
   imageDownloadRetryLimit: 3
 ```

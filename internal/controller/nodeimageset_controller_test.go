@@ -36,7 +36,7 @@ var _ = Describe("NodeImageSet Controller", func() {
 						Namespace: "default",
 					},
 					Spec: ofenv1.NodeImageSetSpec{
-						ImageSet: []string{
+						Images: []string{
 							"test-image",
 						},
 						RegistryPolicy: ofenv1.RegistryPolicyDefault,
