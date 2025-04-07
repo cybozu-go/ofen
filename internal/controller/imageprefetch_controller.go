@@ -501,9 +501,6 @@ func (r *ImagePrefetchReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			nodeImageSetHandler,
 			builder.WithPredicates(
 				predicate.Funcs{
-					CreateFunc: func(e event.CreateEvent) bool {
-						return false
-					},
 					UpdateFunc: func(e event.UpdateEvent) bool {
 						return true
 					},
@@ -520,9 +517,6 @@ func (r *ImagePrefetchReconciler) SetupWithManager(mgr ctrl.Manager) error {
 				predicate.Funcs{
 					CreateFunc: func(e event.CreateEvent) bool {
 						return true
-					},
-					UpdateFunc: func(e event.UpdateEvent) bool {
-						return false
 					},
 					DeleteFunc: func(e event.DeleteEvent) bool {
 						return true
