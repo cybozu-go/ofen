@@ -65,8 +65,8 @@ spec:
                   type: object
                   x-kubernetes-map-type: atomic
                 type: array
-              imageSet:
-                description: ImageSet is a list of image sets to be downloaded.
+              images:
+                description: Images is a list of image sets to be downloaded.
                 items:
                   type: string
                 type: array
@@ -78,7 +78,7 @@ spec:
                   from the registry.
                 type: string
             required:
-            - imageSet
+            - images
             - nodeName
             - registryPolicy
             type: object

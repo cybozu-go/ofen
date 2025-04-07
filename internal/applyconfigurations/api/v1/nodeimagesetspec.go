@@ -10,7 +10,7 @@ import (
 // NodeImageSetSpecApplyConfiguration represents a declarative configuration of the NodeImageSetSpec type for use
 // with apply.
 type NodeImageSetSpecApplyConfiguration struct {
-	ImageSet                []string                      `json:"imageSet,omitempty"`
+	Images                  []string                      `json:"images,omitempty"`
 	RegistryPolicy          *v1.RegistryPolicy            `json:"registryPolicy,omitempty"`
 	NodeName                *string                       `json:"nodeName,omitempty"`
 	ImagePullSecrets        []corev1.LocalObjectReference `json:"imagePullSecrets,omitempty"`
@@ -23,12 +23,12 @@ func NodeImageSetSpec() *NodeImageSetSpecApplyConfiguration {
 	return &NodeImageSetSpecApplyConfiguration{}
 }
 
-// WithImageSet adds the given value to the ImageSet field in the declarative configuration
+// WithImages adds the given value to the Images field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
-// If called multiple times, values provided by each call will be appended to the ImageSet field.
-func (b *NodeImageSetSpecApplyConfiguration) WithImageSet(values ...string) *NodeImageSetSpecApplyConfiguration {
+// If called multiple times, values provided by each call will be appended to the Images field.
+func (b *NodeImageSetSpecApplyConfiguration) WithImages(values ...string) *NodeImageSetSpecApplyConfiguration {
 	for i := range values {
-		b.ImageSet = append(b.ImageSet, values[i])
+		b.Images = append(b.Images, values[i])
 	}
 	return b
 }

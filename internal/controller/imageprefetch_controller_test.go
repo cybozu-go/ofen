@@ -107,7 +107,7 @@ var _ = Describe("ImagePrefetch Controller", func() {
 				for _, nodeImageSet := range nodeImageSets.Items {
 					g.Expect(nodeImageSet.Spec.ImagePullSecrets).To(Equal([]corev1.LocalObjectReference{{
 						Name: testImagePullSecret}}))
-					g.Expect(nodeImageSet.Spec.ImageSet).Should(ConsistOf(testImagesList))
+					g.Expect(nodeImageSet.Spec.Images).Should(ConsistOf(testImagesList))
 				}
 				defaultPolicy, mirrorOnly := countRegistryPolicy(nodeImageSets)
 				g.Expect(defaultPolicy).To(Equal(1)) // 1node
@@ -431,7 +431,7 @@ var _ = Describe("ImagePrefetch Controller", func() {
 				g.Expect(err).NotTo(HaveOccurred())
 				g.Expect(nodeImageSets.Items).To(HaveLen(replicas))
 				for _, nodeImageSet := range nodeImageSets.Items {
-					g.Expect(nodeImageSet.Spec.ImageSet).Should(ConsistOf(testImagesList))
+					g.Expect(nodeImageSet.Spec.Images).Should(ConsistOf(testImagesList))
 				}
 
 				defaultPolicy, mirrorOnly := countRegistryPolicy(nodeImageSets)
@@ -568,7 +568,7 @@ var _ = Describe("ImagePrefetch Controller", func() {
 					g.Expect(nodeImageSet.Spec.NodeName).To(SatisfyAny(Equal("worker-4"), Equal("worker-6")))
 				}
 				for _, nodeImageSet := range nodeImageSets.Items {
-					g.Expect(nodeImageSet.Spec.ImageSet).Should(ConsistOf(testImagesList))
+					g.Expect(nodeImageSet.Spec.Images).Should(ConsistOf(testImagesList))
 
 				}
 
