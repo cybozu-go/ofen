@@ -125,7 +125,15 @@ func (r *ImagePrefetchReconciler) selectTargetNodes(ctx context.Context, imgPref
 		}
 
 		if imgPrefetch.Spec.Replicas > 0 {
-			return getNodeNames(nodes[:imgPrefetch.Spec.Replicas]), nil
+			replicasCount := imgPrefetch.Spec.Replicas
+			if replicasCount > len(nodes) {
+				logger.Info("requested replicas exceeds available nodes",
+					"requested", imgPrefetch.Spec.Replicas,
+					"available", len(nodes))
+				replicasCount = len(nodes)
+			}
+
+			return getNodeNames(nodes[:replicasCount]), nil
 		}
 
 		return getNodeNames(nodes), nil
