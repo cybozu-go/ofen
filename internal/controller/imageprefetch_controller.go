@@ -72,6 +72,7 @@ func (r *ImagePrefetchReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 			logger.Error(err, "failed to add finalizer")
 			return ctrl.Result{}, err
 		}
+		return ctrl.Result{Requeue: true}, nil
 	}
 
 	if util.IsLabelSelectorEmpty(&imgPrefetch.Spec.NodeSelector) && imgPrefetch.Spec.Replicas == 0 {
