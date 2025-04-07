@@ -9,17 +9,26 @@ import (
 // NodeImageSetStatusApplyConfiguration represents a declarative configuration of the NodeImageSetStatus type for use
 // with apply.
 type NodeImageSetStatusApplyConfiguration struct {
-	ObservedGeneration   *int64                           `json:"observedGeneration,omitempty"`
-	Conditions           []v1.ConditionApplyConfiguration `json:"conditions,omitempty"`
-	DesiredImages        *int                             `json:"desiredImages,omitempty"`
-	AvailableImages      *int                             `json:"availableImages,omitempty"`
-	DownloadFailedImages *int                             `json:"downloadFailedImages,omitempty"`
+	ImagePrefetchGeneration *int64                           `json:"imagePrefetchGeneration,omitempty"`
+	ObservedGeneration      *int64                           `json:"observedGeneration,omitempty"`
+	Conditions              []v1.ConditionApplyConfiguration `json:"conditions,omitempty"`
+	DesiredImages           *int                             `json:"desiredImages,omitempty"`
+	AvailableImages         *int                             `json:"availableImages,omitempty"`
+	DownloadFailedImages    *int                             `json:"downloadFailedImages,omitempty"`
 }
 
 // NodeImageSetStatusApplyConfiguration constructs a declarative configuration of the NodeImageSetStatus type for use with
 // apply.
 func NodeImageSetStatus() *NodeImageSetStatusApplyConfiguration {
 	return &NodeImageSetStatusApplyConfiguration{}
+}
+
+// WithImagePrefetchGeneration sets the ImagePrefetchGeneration field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the ImagePrefetchGeneration field is set to the value of the last call.
+func (b *NodeImageSetStatusApplyConfiguration) WithImagePrefetchGeneration(value int64) *NodeImageSetStatusApplyConfiguration {
+	b.ImagePrefetchGeneration = &value
+	return b
 }
 
 // WithObservedGeneration sets the ObservedGeneration field in the declarative configuration to the given value

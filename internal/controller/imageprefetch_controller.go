@@ -287,11 +287,20 @@ func (r *ImagePrefetchReconciler) createOrUpdateNodeImageSet(ctx context.Context
 				WithRegistryPolicy(registryPolicy).
 				WithNodeName(nodeName).
 				WithImagePullSecrets(imgPrefetch.Spec.ImagePullSecrets...),
+			).
+			WithStatus(
+				ofenv1apply.NodeImageSetStatus().
+					WithImagePrefetchGeneration(imgPrefetch.Generation),
 			)
 
 		if err := r.applyNodeImageSet(ctx, nodeImageSet, nodeImageSetName); err != nil {
 			return fmt.Errorf("failed to apply NodeImageSet: %w", err)
 		}
+
+		if err := r.applyNodeImageSetStatus(ctx, nodeImageSet, nodeImageSetName); err != nil {
+			return fmt.Errorf("failed to apply NodeImageSet status: %w", err)
+		}
+
 	}
 
 	// Delete unnecessary NodeImageSets
@@ -347,6 +356,30 @@ func (r *ImagePrefetchReconciler) applyNodeImageSet(ctx context.Context, nodeIma
 	})
 }
 
+func (r *ImagePrefetchReconciler) applyNodeImageSetStatus(ctx context.Context, nodeImageSet *ofenv1apply.NodeImageSetApplyConfiguration, name string) error {
+	obj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(nodeImageSet)
+	if err != nil {
+		return fmt.Errorf("failed to convert NodeImageSet status: %w", err)
+	}
+	patch := &unstructured.Unstructured{Object: obj}
+
+	var current ofenv1.NodeImageSet
+	if err := r.Get(ctx, types.NamespacedName{Name: name}, &current); err != nil {
+		return fmt.Errorf("failed to get NodeImageSet for status update: %w", err)
+	}
+
+	currentStatusApplyConfig, err := ofenv1apply.ExtractNodeImageSetStatus(&current, constants.ImagePrefetchFieldManager)
+	if err != nil {
+		return fmt.Errorf("failed to extract NodeImageSet status: %w", err)
+	}
+
+	if equality.Semantic.DeepEqual(currentStatusApplyConfig, nodeImageSet) {
+		return nil
+	}
+
+	return r.Status().Patch(ctx, patch, client.Apply, client.ForceOwnership, client.FieldOwner(constants.ImagePrefetchFieldManager))
+}
+
 func labelSet(imgPrefetch *ofenv1.ImagePrefetch, nodeName string) map[string]string {
 	return map[string]string{
 		constants.OwnerImagePrefetchNamespace: imgPrefetch.Namespace,
@@ -391,7 +424,7 @@ func (r *ImagePrefetchReconciler) updateStatus(ctx context.Context, imgPrefetch 
 		return ctrl.Result{}, fmt.Errorf("failed to list NodeImageSets: %w", err)
 	}
 
-	status := calculateStatus(selectedNodes, nodeImageSets)
+	status := calculateStatus(selectedNodes, nodeImageSets, imgPrefetch.Generation)
 	imgPrefetch.Status.DesiredNodes = status.desiredNodes
 	imgPrefetch.Status.ImagePulledNodes = status.availableNodes
 	imgPrefetch.Status.ImagePullingNodes = status.pullingNodes
@@ -434,11 +467,17 @@ type NodeImageSetStatus struct {
 	pullFailedNodes int
 }
 
-func calculateStatus(selectNodes []string, nodeImageSets *ofenv1.NodeImageSetList) NodeImageSetStatus {
+func calculateStatus(selectNodes []string, nodeImageSets *ofenv1.NodeImageSetList, generation int64) NodeImageSetStatus {
 	status := NodeImageSetStatus{}
 	status.desiredNodes = len(selectNodes)
 
 	for _, nodeImageSet := range nodeImageSets.Items {
+		if nodeImageSet.Status.ImagePrefetchGeneration != generation {
+			// Skip if NodeImageSet has an old generation of ImagePrefetch.
+			// This occurs when the ImagePrefetch controller has outdated NodeImageSet information.
+			continue
+		}
+
 		if meta.IsStatusConditionTrue(nodeImageSet.Status.Conditions, ofenv1.ConditionImageAvailable) {
 			status.availableNodes++
 		}

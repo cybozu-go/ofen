@@ -40,6 +40,11 @@ const (
 
 // NodeImageSetStatus defines the observed state of NodeImageSet
 type NodeImageSetStatus struct {
+	// ImagePrefetchGeneration is the generation of the image prefetch resource.
+	// It is used to track the status of the image prefetch resource.
+	// +optional
+	ImagePrefetchGeneration int64 `json:"imagePrefetchGeneration,omitempty"`
+
 	// The generation observed by the controller.
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
