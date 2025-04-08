@@ -7,4 +7,5 @@ metadata:
   name: imageprefetch-sample
 spec:
   images:
-    - ghcr.io/cybozu/ubuntu:24.04
+    - quay.io/cybozu/ubuntu:24.04
+  replicas: 3
