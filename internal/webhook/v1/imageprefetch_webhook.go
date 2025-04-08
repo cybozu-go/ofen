@@ -28,7 +28,7 @@ func SetupImagePrefetchWebhookWithManager(mgr ctrl.Manager) error {
 		Complete()
 }
 
-// +kubebuilder:webhook:path=/mutate-ofen-cybozu-io-v1-imageprefetch,mutating=true,failurePolicy=fail,sideEffects=None,groups=ofen.cybozu.io,resources=imageprefetches,verbs=create,versions=v1,name=mimageprefetch.kb.io,admissionReviewVersions=v1
+// +kubebuilder:webhook:path=/mutate-ofen-cybozu-io-v1-imageprefetch,mutating=true,failurePolicy=fail,sideEffects=None,groups=ofen.cybozu.io,resources=imageprefetches,verbs=create;update,versions=v1,name=mimageprefetch.kb.io,admissionReviewVersions=v1
 
 type ImagePrefetchCustomDefaulter struct {
 	// TODO(user): Add more fields as needed for defaulting
