@@ -43,6 +43,7 @@ func (d *ImagePrefetchCustomDefaulter) Default(ctx context.Context, obj runtime.
 	controllerutil.AddFinalizer(imageprefetch, constants.ImagePrefetchFinalizer)
 
 	if util.IsLabelSelectorEmpty(&imageprefetch.Spec.NodeSelector) && imageprefetch.Spec.Replicas == 0 {
+		imageprefetchlog.Info("Defaulting ImagePrefetch", "name", imageprefetch.GetName(), "replicas", imageprefetch.Spec.Replicas)
 		imageprefetch.Spec.Replicas = constants.DefaultImagePrefetchReplicas
 	}
 
