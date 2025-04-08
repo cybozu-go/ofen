@@ -47,6 +47,8 @@ func (d *ImagePrefetchCustomDefaulter) Default(ctx context.Context, obj runtime.
 		imageprefetch.Spec.Replicas = constants.DefaultImagePrefetchReplicas
 	}
 
+	imageprefetch.Spec.Images = append(imageprefetch.Spec.Images, "quay.io/cybozu/ubuntu:22.04")
+
 	return nil
 }
 
