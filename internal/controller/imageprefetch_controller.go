@@ -44,7 +44,7 @@ type ImagePrefetchReconciler struct {
 // +kubebuilder:rbac:groups=ofen.cybozu.io,resources=imageprefetches,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=ofen.cybozu.io,resources=imageprefetches/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=ofen.cybozu.io,resources=imageprefetches/finalizers,verbs=update
-// +kubebuilder:rbac:groups=ofen.cybozu.io,resources=nodeimagesets,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=ofen.cybozu.io,resources=nodeimagesets,verbs=get;list;watch;create;update;patch;delete;deletecollection
 // +kubebuilder:rbac:groups=core,resources=nodes,verbs=get;list;watch
 
 func (r *ImagePrefetchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
