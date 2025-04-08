@@ -8,4 +8,3 @@ metadata:
 spec:
   images:
     - ghcr.io/cybozu/ubuntu:24.04
-  replicas: 2
