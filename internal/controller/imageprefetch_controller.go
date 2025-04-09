@@ -75,10 +75,6 @@ func (r *ImagePrefetchReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		return ctrl.Result{Requeue: true}, nil
 	}
 
-	if util.IsLabelSelectorEmpty(&imgPrefetch.Spec.NodeSelector) && imgPrefetch.Spec.Replicas == 0 {
-		return ctrl.Result{}, fmt.Errorf("NodeSelector or Replicas must be specified")
-	}
-
 	selectNodes, err := r.selectTargetNodes(ctx, &imgPrefetch)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to select target nodes: %w", err)
@@ -125,6 +121,10 @@ func (r *ImagePrefetchReconciler) selectTargetNodes(ctx context.Context, imgPref
 			return nil, err
 		}
 
+		if imgPrefetch.Spec.AllNodes {
+			return getNodeNames(nodes), nil
+		}
+
 		if imgPrefetch.Spec.Replicas > 0 {
 			replicasCount := imgPrefetch.Spec.Replicas
 			if replicasCount > len(nodes) {
@@ -137,7 +137,15 @@ func (r *ImagePrefetchReconciler) selectTargetNodes(ctx context.Context, imgPref
 			return getNodeNames(nodes[:replicasCount]), nil
 		}
 
-		return getNodeNames(nodes), nil
+	}
+
+	if imgPrefetch.Spec.AllNodes {
+		allNodes := &corev1.NodeList{}
+		if err := r.List(ctx, allNodes); err != nil {
+			return nil, err
+		}
+		readyNodes := filterReadyNodes(allNodes.Items)
+		return getNodeNames(readyNodes), nil
 	}
 
 	if imgPrefetch.Spec.Replicas > 0 {

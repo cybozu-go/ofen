@@ -39,6 +39,11 @@ spec:
           spec:
             description: ImagePrefetchSpec defines the desired state of ImagePrefetch
             properties:
+              allNodes:
+                default: false
+                description: AllNodes indicates whether the images should be pre-downloaded
+                  to all nodes in the cluster
+                type: boolean
               imagePullSecrets:
                 description: ImagePullSecrets is a list of secret names that contain
                   credentials for authenticating with container registries

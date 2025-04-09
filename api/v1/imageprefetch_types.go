@@ -14,6 +14,11 @@ type ImagePrefetchSpec struct {
 	// +optional
 	NodeSelector metav1.LabelSelector `json:"nodeSelector,omitempty"`
 
+	// AllNodes indicates whether the images should be pre-downloaded to all nodes in the cluster
+	// +optional
+	// +kubebuilder:default=false
+	AllNodes bool `json:"allNodes,omitempty"`
+
 	// Replicas is the number of nodes that should download the specified images
 	// +optional
 	Replicas int `json:"replicas,omitempty"`

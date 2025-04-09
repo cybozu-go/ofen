@@ -526,7 +526,7 @@ var _ = Describe("ImagePrefetch Controller", func() {
 			}).Should(Succeed())
 		})
 
-		It("should create NodeImageSets according to the node selector", func() {
+		It("should create NodeImageSets according to the node selector and replicas", func() {
 			By("creating new nodes")
 			for i := 4; i < 7; i++ {
 				createNewNode(fmt.Sprintf("%s-%d", nodePrefix, i), rackNumber[1])
@@ -546,12 +546,14 @@ var _ = Describe("ImagePrefetch Controller", func() {
 					},
 				},
 			}
+			replicas := 2
 
 			createNamespace(testName)
 			createNewImagePrefetch(testName,
 				ofenv1.ImagePrefetchSpec{
 					Images:       testImagesList,
 					NodeSelector: nodeSelector,
+					Replicas:     replicas,
 				},
 			)
 
@@ -578,21 +580,17 @@ var _ = Describe("ImagePrefetch Controller", func() {
 			}).Should(Succeed())
 		})
 
-		It("should increase or decrease the number of NodeImageSets when nodes are added or removed", func() {
-			By("creating ImagePrefetch with node selector")
-			testName := "add-remove-node"
-			nodeSelector := metav1.LabelSelector{
-				MatchLabels: map[string]string{
-					"beta.kubernetes.io/arch": "amd64",
-				},
-			}
+		It("should create NodeImageSets according to the allNodes", func() {
+			By("creating ImagePrefetch with allNodes")
+			testName := "all-nodes"
 			createNamespace(testName)
 			createNewImagePrefetch(testName,
 				ofenv1.ImagePrefetchSpec{
-					Images:       testImagesList,
-					NodeSelector: nodeSelector,
+					Images:   testImagesList,
+					AllNodes: true,
 				},
 			)
+
 			Eventually(func(g Gomega) {
 				nodeImageSets := &ofenv1.NodeImageSetList{}
 				err := k8sClient.List(ctx, nodeImageSets, &client.ListOptions{
@@ -602,6 +600,36 @@ var _ = Describe("ImagePrefetch Controller", func() {
 				})
 				g.Expect(err).NotTo(HaveOccurred())
 				g.Expect(len(nodeImageSets.Items)).To(Equal(6))
+			}).Should(Succeed())
+		})
+
+		It("should increase or decrease the number of NodeImageSets when nodes are added or removed", func() {
+			By("creating ImagePrefetch with node selector")
+			testName := "add-remove-node"
+			nodeSelector := metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"topology.kubernetes.io/zone": rackNumber[1],
+				},
+			}
+
+			createNamespace(testName)
+			createNewImagePrefetch(testName,
+				ofenv1.ImagePrefetchSpec{
+					Images:       testImagesList,
+					NodeSelector: nodeSelector,
+					AllNodes:     true,
+				},
+			)
+
+			Eventually(func(g Gomega) {
+				nodeImageSets := &ofenv1.NodeImageSetList{}
+				err := k8sClient.List(ctx, nodeImageSets, &client.ListOptions{
+					LabelSelector: labels.SelectorFromSet(map[string]string{
+						constants.OwnerImagePrefetchNamespace: testName,
+					}),
+				})
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(len(nodeImageSets.Items)).To(Equal(3))
 			}).Should(Succeed())
 
 			By("adding a new node")
@@ -617,14 +645,14 @@ var _ = Describe("ImagePrefetch Controller", func() {
 					}),
 				})
 				g.Expect(err).NotTo(HaveOccurred())
-				g.Expect(nodeImageSets.Items).To(HaveLen(7))
+				g.Expect(nodeImageSets.Items).To(HaveLen(4))
 			}).Should(Succeed())
 
 			By("removing a node")
-			nodeList := &corev1.NodeList{}
-			err := k8sClient.List(ctx, nodeList)
+			node := &corev1.Node{}
+			err := k8sClient.Get(ctx, client.ObjectKey{Name: newNodeName}, node)
 			Expect(err).NotTo(HaveOccurred())
-			err = k8sClient.Delete(ctx, &nodeList.Items[0])
+			err = k8sClient.Delete(ctx, node)
 			Expect(err).NotTo(HaveOccurred())
 
 			By("checking the number of NodeImageSets is decreased")
@@ -636,7 +664,7 @@ var _ = Describe("ImagePrefetch Controller", func() {
 					}),
 				})
 				g.Expect(err).NotTo(HaveOccurred())
-				g.Expect(nodeImageSets.Items).To(HaveLen(6))
+				g.Expect(nodeImageSets.Items).To(HaveLen(3))
 			}).Should(Succeed())
 		})
 
