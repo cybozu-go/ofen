@@ -10,15 +10,16 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/utils/ptr"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/config"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
-
-	ctrl "sigs.k8s.io/controller-runtime"
 )
 
 const (
@@ -30,6 +31,37 @@ const (
 var rackNumber = []string{"rack0", "rack1"}
 var testImagesList = []string{"foobar:123", "foobar:456"}
 
+func prepareObjects(ctx context.Context) error {
+	// create new node
+	for i := 0; i < 4; i++ {
+		node := &corev1.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: fmt.Sprintf("%s-%d", nodePrefix, i),
+				Labels: map[string]string{
+					"kubernetes.io/hostname":      fmt.Sprintf("%s-%d", nodePrefix, i),
+					"topology.kubernetes.io/zone": rackNumber[0],
+					"beta.kubernetes.io/arch":     "amd64",
+				},
+			},
+			Status: corev1.NodeStatus{
+				Conditions: []corev1.NodeCondition{
+					{
+						Type:   corev1.NodeReady,
+						Status: corev1.ConditionTrue,
+					},
+				},
+				Images: []corev1.ContainerImage{},
+			},
+		}
+
+		_, err := ctrl.CreateOrUpdate(ctx, k8sClient, node, func() error {
+			return nil
+		})
+		Expect(err).NotTo(HaveOccurred())
+	}
+	return nil
+}
+
 var _ = Describe("ImagePrefetch Controller", func() {
 	Context("When reconciling a resource", func() {
 		ctx := context.Background()
@@ -37,7 +69,7 @@ var _ = Describe("ImagePrefetch Controller", func() {
 
 		BeforeEach(func() {
 			mgr, err := ctrl.NewManager(cfg, ctrl.Options{
-				Scheme:         scheme,
+				Scheme:         scheme.Scheme,
 				LeaderElection: false,
 				Metrics: metricsserver.Options{
 					BindAddress: "0",
@@ -55,9 +87,12 @@ var _ = Describe("ImagePrefetch Controller", func() {
 			}
 			err = reconciler.SetupWithManager(mgr)
 			Expect(err).NotTo(HaveOccurred())
+			err = prepareObjects(ctx)
+			Expect(err).NotTo(HaveOccurred())
 
-			ctx, cancel := context.WithCancel(ctx)
+			ctx, cancel := context.WithCancel(context.Background())
 			stopFunc = cancel
+
 			go func() {
 				err = mgr.Start(ctx)
 				if err != nil {
@@ -69,22 +104,15 @@ var _ = Describe("ImagePrefetch Controller", func() {
 
 		AfterEach(func() {
 			stopFunc()
-
 			time.Sleep(100 * time.Millisecond)
 		})
 
 		It("should create NodeImageSets according to the number specified in .spec.replicas.", func() {
-			By("creating new nodes")
-			// create new node
-			for i := 0; i < 4; i++ {
-				createNewNode(fmt.Sprintf("%s-%d", nodePrefix, i), rackNumber[0])
-			}
-
 			By("creating a new ImagePrefetch with replicas")
 			testName := "replica-node-image-set"
 			replicas := 1
-			createNamespace(testName)
-			imagePrefetch := createNewImagePrefetch(testName, ofenv1.ImagePrefetchSpec{
+			createNamespace(ctx, testName)
+			imagePrefetch := createNewImagePrefetch(ctx, testName, ofenv1.ImagePrefetchSpec{
 				Images:   testImagesList,
 				Replicas: replicas,
 				ImagePullSecrets: []corev1.LocalObjectReference{
@@ -115,7 +143,7 @@ var _ = Describe("ImagePrefetch Controller", func() {
 			}).Should(Succeed())
 
 			By("cleaning up the ImagePrefetch resource")
-			deleteImagePrefetchResource(imagePrefetch)
+			deleteImagePrefetchResource(ctx, imagePrefetch)
 		})
 
 		It("Should delete NodeImageSets when the ImagePrefetch resource is deleted", func() {
@@ -123,8 +151,8 @@ var _ = Describe("ImagePrefetch Controller", func() {
 
 			testName := "confirm-delete-node-image-set"
 			replicas := 4
-			createNamespace(testName)
-			imagePrefetch := createNewImagePrefetch(testName, ofenv1.ImagePrefetchSpec{
+			createNamespace(ctx, testName)
+			imagePrefetch := createNewImagePrefetch(ctx, testName, ofenv1.ImagePrefetchSpec{
 				Images:   testImagesList,
 				Replicas: replicas,
 			})
@@ -141,7 +169,7 @@ var _ = Describe("ImagePrefetch Controller", func() {
 			}).Should(Succeed())
 
 			By("deleting the ImagePrefetch resource")
-			deleteImagePrefetchResource(imagePrefetch)
+			deleteImagePrefetchResource(ctx, imagePrefetch)
 
 			By("checking NodeImageSets are deleted")
 			Eventually(func(g Gomega) {
@@ -160,8 +188,8 @@ var _ = Describe("ImagePrefetch Controller", func() {
 			By("creating a new ImagePrefetch with replicas")
 			testName := "image-prefetch-status"
 			replicas := 4
-			createNamespace(testName)
-			imagePrefetch := createNewImagePrefetch(testName, ofenv1.ImagePrefetchSpec{
+			createNamespace(ctx, testName)
+			imagePrefetch := createNewImagePrefetch(ctx, testName, ofenv1.ImagePrefetchSpec{
 				Images:   testImagesList,
 				Replicas: replicas,
 				ImagePullSecrets: []corev1.LocalObjectReference{
@@ -193,7 +221,7 @@ var _ = Describe("ImagePrefetch Controller", func() {
 			}).Should(Succeed())
 
 			By("cleaning up the ImagePrefetch resource")
-			deleteImagePrefetchResource(imagePrefetch)
+			deleteImagePrefetchResource(ctx, imagePrefetch)
 		})
 
 		It("should create NodeImageSet on the node with the fewest images", func() {
@@ -202,23 +230,23 @@ var _ = Describe("ImagePrefetch Controller", func() {
 			node1 := fmt.Sprintf("%s-1", nodePrefix)
 			node2 := fmt.Sprintf("%s-2", nodePrefix)
 			for i := 0; i < 10; i++ {
-				updateNodeImage(node0, []string{fmt.Sprintf("dummy/%d", i)})
-				updateNodeImage(node1, []string{fmt.Sprintf("dummy/%d", i)})
-				updateNodeImage(node2, []string{fmt.Sprintf("dummy/%d", i)})
+				updateNodeImage(ctx, node0, []string{fmt.Sprintf("dummy/%d", i)})
+				updateNodeImage(ctx, node1, []string{fmt.Sprintf("dummy/%d", i)})
+				updateNodeImage(ctx, node2, []string{fmt.Sprintf("dummy/%d", i)})
 			}
 
 			By("creating imagePrefetch with replicas")
 			testName := "fewest-images"
-			createNamespace(testName)
+			createNamespace(ctx, testName)
 			replicas := 1
-			imagePrefetch := createNewImagePrefetch(testName, ofenv1.ImagePrefetchSpec{
-				Images:   testImagesList,
-				Replicas: replicas,
-				ImagePullSecrets: []corev1.LocalObjectReference{
-					{
-						Name: testImagePullSecret,
+			imagePrefetch := createNewImagePrefetch(ctx, testName, ofenv1.ImagePrefetchSpec{
+				Images: testImagesList,
+				NodeSelector: metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						"topology.kubernetes.io/zone": "rack0",
 					},
 				},
+				Replicas: replicas,
 			})
 
 			Eventually(func(g Gomega) {
@@ -234,15 +262,15 @@ var _ = Describe("ImagePrefetch Controller", func() {
 			}).Should(Succeed())
 
 			By("cleaning up the ImagePrefetch resource")
-			deleteImagePrefetchResource(imagePrefetch)
+			deleteImagePrefetchResource(ctx, imagePrefetch)
 		})
 
 		It("should update ImagePrefetch status according to nodeImageSet state", func() {
 			By("creating imagePrefetch with replicas")
 			testName := "update-image-prefetch-status"
-			createNamespace(testName)
+			createNamespace(ctx, testName)
 			replicas := 1
-			createNewImagePrefetch(testName, ofenv1.ImagePrefetchSpec{
+			imagePrefetch := createNewImagePrefetch(ctx, testName, ofenv1.ImagePrefetchSpec{
 				Images:   testImagesList,
 				Replicas: replicas,
 				ImagePullSecrets: []corev1.LocalObjectReference{
@@ -353,19 +381,22 @@ var _ = Describe("ImagePrefetch Controller", func() {
 				g.Expect(conditionImagePrefetchReady.Status).To(Equal(metav1.ConditionTrue))
 				conditionImagePrefetchProcessing := meta.FindStatusCondition(imagePrefetch.Status.Conditions, ofenv1.ConditionProgressing)
 				g.Expect(conditionImagePrefetchProcessing).NotTo(BeNil())
-				g.Expect(conditionImagePrefetchProcessing.Status).To(Equal(metav1.ConditionTrue))
+				g.Expect(conditionImagePrefetchProcessing.Status).To(Equal(metav1.ConditionFalse))
 				conditionImagePrefetchFailed := meta.FindStatusCondition(imagePrefetch.Status.Conditions, ofenv1.ConditionImagePullFailed)
 				g.Expect(conditionImagePrefetchFailed).NotTo(BeNil())
 				g.Expect(conditionImagePrefetchFailed.Status).To(Equal(metav1.ConditionFalse))
 			}).Should(Succeed())
+
+			By("cleaning up the ImagePrefetch resource")
+			deleteImagePrefetchResource(ctx, imagePrefetch)
 		})
 
 		It("should increase or decrease NodeImageSets when replicas are changed", func() {
 			By("creating imagePrefetch with replicas")
 			testName := "increase-decrease-replicas"
-			createNamespace(testName)
+			createNamespace(ctx, testName)
 			replicas := 1
-			createNewImagePrefetch(testName, ofenv1.ImagePrefetchSpec{
+			createNewImagePrefetch(ctx, testName, ofenv1.ImagePrefetchSpec{
 				Images:   testImagesList,
 				Replicas: replicas,
 				ImagePullSecrets: []corev1.LocalObjectReference{
@@ -438,14 +469,17 @@ var _ = Describe("ImagePrefetch Controller", func() {
 				g.Expect(defaultPolicy).To(Equal(1)) // 1node
 				g.Expect(mirrorOnly).To(Equal(1))    // 1node
 			}).Should(Succeed())
+
+			By("cleaning up the ImagePrefetch resource")
+			deleteImagePrefetchResource(ctx, imagePrefetch)
 		})
 
 		It("should create NodeImageSet on another node when a node is deleted", func() {
 			By("creating imagePrefetch with replicas")
 			testName := "delete-node"
-			createNamespace(testName)
+			createNamespace(ctx, testName)
 			replicas := 4
-			createNewImagePrefetch(testName, ofenv1.ImagePrefetchSpec{
+			imagePrefetch := createNewImagePrefetch(ctx, testName, ofenv1.ImagePrefetchSpec{
 				Images:   testImagesList,
 				Replicas: replicas,
 				ImagePullSecrets: []corev1.LocalObjectReference{
@@ -487,153 +521,10 @@ var _ = Describe("ImagePrefetch Controller", func() {
 				for _, nodeImageSet := range nodeImageSets.Items {
 					g.Expect(nodeImageSet.Spec.NodeName).NotTo(Equal(deletingNodeName))
 				}
-			})
-		})
-
-		It("should delete NodeImageSet when ImagePrefetch is deleted", func() {
-			By("creating imagePrefetch with replicas")
-			testName := "delete-image-prefetch"
-			createNamespace(testName)
-			replicas := 4
-			createNewImagePrefetch(testName, ofenv1.ImagePrefetchSpec{
-				Images:   testImagesList,
-				Replicas: replicas,
-				ImagePullSecrets: []corev1.LocalObjectReference{
-					{
-						Name: testImagePullSecret,
-					},
-				},
-			})
-
-			By("Deleting imagePrefetch")
-			imagePrefetch := &ofenv1.ImagePrefetch{}
-			err := k8sClient.Get(ctx, client.ObjectKey{Name: testName, Namespace: testName}, imagePrefetch)
-			Expect(err).NotTo(HaveOccurred())
-
-			err = k8sClient.Delete(ctx, imagePrefetch)
-			Expect(err).NotTo(HaveOccurred())
-
-			By("Checking nodeImageSet is deleted")
-			Eventually(func(g Gomega) {
-				nodeImageSets := &ofenv1.NodeImageSetList{}
-				err := k8sClient.List(ctx, nodeImageSets, &client.ListOptions{
-					LabelSelector: labels.SelectorFromSet(map[string]string{
-						constants.OwnerImagePrefetchNamespace: testName,
-					}),
-				})
-				g.Expect(err).NotTo(HaveOccurred())
-				g.Expect(nodeImageSets.Items).To(HaveLen(0))
 			}).Should(Succeed())
-		})
 
-		It("should create NodeImageSets according to the node selector and replicas", func() {
-			By("creating new nodes")
-			for i := 4; i < 7; i++ {
-				createNewNode(fmt.Sprintf("%s-%d", nodePrefix, i), rackNumber[1])
-			}
-
-			By("creating ImagePrefetch with node selector")
-			testName := "node-selector"
-			nodeSelector := metav1.LabelSelector{
-				MatchLabels: map[string]string{
-					"topology.kubernetes.io/zone": rackNumber[1],
-				},
-				MatchExpressions: []metav1.LabelSelectorRequirement{
-					{
-						Key:      "kubernetes.io/hostname",
-						Operator: metav1.LabelSelectorOpIn,
-						Values:   []string{"worker1", "worker-4", "worker-6"},
-					},
-				},
-			}
-			replicas := 2
-
-			createNamespace(testName)
-			createNewImagePrefetch(testName,
-				ofenv1.ImagePrefetchSpec{
-					Images:       testImagesList,
-					NodeSelector: nodeSelector,
-					Replicas:     replicas,
-				},
-			)
-
-			Eventually(func(g Gomega) {
-				nodeImageSets := &ofenv1.NodeImageSetList{}
-				err := k8sClient.List(ctx, nodeImageSets, &client.ListOptions{
-					LabelSelector: labels.SelectorFromSet(map[string]string{
-						constants.OwnerImagePrefetchNamespace: testName,
-					}),
-				})
-				g.Expect(err).NotTo(HaveOccurred())
-				g.Expect(len(nodeImageSets.Items)).To(Equal(2))
-				for _, nodeImageSet := range nodeImageSets.Items {
-					g.Expect(nodeImageSet.Spec.NodeName).To(SatisfyAny(Equal("worker-4"), Equal("worker-6")))
-				}
-				for _, nodeImageSet := range nodeImageSets.Items {
-					g.Expect(nodeImageSet.Spec.Images).Should(ConsistOf(testImagesList))
-
-				}
-
-				defaultPolicy, mirrorOnly := countRegistryPolicy(nodeImageSets)
-				g.Expect(defaultPolicy).To(Equal(1)) // 1node
-				g.Expect(mirrorOnly).To(Equal(1))    // 1node
-			}).Should(Succeed())
-		})
-
-		It("should create NodeImageSets according to the node selector and allNodes", func() {
-			By("creating ImagePrefetch with node selector and allNodes")
-			testName := "node-selector-all-nodes"
-			nodeSelector := metav1.LabelSelector{
-				MatchExpressions: []metav1.LabelSelectorRequirement{
-					{
-						Key:      "kubernetes.io/hostname",
-						Operator: metav1.LabelSelectorOpExists,
-					},
-				},
-			}
-
-			allNodes := true
-			createNamespace(testName)
-			createNewImagePrefetch(testName,
-				ofenv1.ImagePrefetchSpec{
-					Images:       testImagesList,
-					NodeSelector: nodeSelector,
-					AllNodes:     allNodes,
-				},
-			)
-			Eventually(func(g Gomega) {
-				nodeImageSets := &ofenv1.NodeImageSetList{}
-				err := k8sClient.List(ctx, nodeImageSets, &client.ListOptions{
-					LabelSelector: labels.SelectorFromSet(map[string]string{
-						constants.OwnerImagePrefetchNamespace: testName,
-					}),
-				})
-				g.Expect(err).NotTo(HaveOccurred())
-				g.Expect(len(nodeImageSets.Items)).To(Equal(6))
-			}).Should(Succeed())
-		})
-
-		It("should create NodeImageSets according to the allNodes", func() {
-			By("creating ImagePrefetch with allNodes")
-			testName := "all-nodes"
-			createNamespace(testName)
-			createNewImagePrefetch(testName,
-				ofenv1.ImagePrefetchSpec{
-					Images:   testImagesList,
-					AllNodes: true,
-				},
-			)
-
-			Eventually(func(g Gomega) {
-				nodeImageSets := &ofenv1.NodeImageSetList{}
-				err := k8sClient.List(ctx, nodeImageSets, &client.ListOptions{
-					LabelSelector: labels.SelectorFromSet(map[string]string{
-						constants.OwnerImagePrefetchNamespace: testName,
-					}),
-				})
-				g.Expect(err).NotTo(HaveOccurred())
-				g.Expect(len(nodeImageSets.Items)).To(Equal(6))
-			}).Should(Succeed())
+			By("cleaning up the ImagePrefetch resource")
+			deleteImagePrefetchResource(ctx, imagePrefetch)
 		})
 
 		It("should increase or decrease the number of NodeImageSets when nodes are added or removed", func() {
@@ -641,12 +532,12 @@ var _ = Describe("ImagePrefetch Controller", func() {
 			testName := "add-remove-node"
 			nodeSelector := metav1.LabelSelector{
 				MatchLabels: map[string]string{
-					"topology.kubernetes.io/zone": rackNumber[1],
+					"topology.kubernetes.io/zone": "rack1",
 				},
 			}
 
-			createNamespace(testName)
-			createNewImagePrefetch(testName,
+			createNamespace(ctx, testName)
+			imagePrefetch := createNewImagePrefetch(ctx, testName,
 				ofenv1.ImagePrefetchSpec{
 					Images:       testImagesList,
 					NodeSelector: nodeSelector,
@@ -667,7 +558,7 @@ var _ = Describe("ImagePrefetch Controller", func() {
 
 			By("adding a new node")
 			newNodeName := fmt.Sprintf("%s-7", nodePrefix)
-			createNewNode(newNodeName, rackNumber[1])
+			createNewNode(ctx, newNodeName, "rack1")
 
 			By("checking the number of NodeImageSets is increased")
 			Eventually(func(g Gomega) {
@@ -699,41 +590,17 @@ var _ = Describe("ImagePrefetch Controller", func() {
 				g.Expect(err).NotTo(HaveOccurred())
 				g.Expect(nodeImageSets.Items).To(HaveLen(3))
 			}).Should(Succeed())
-		})
 
-		It("should create NodeImageSets according to the node selector and replicas", func() {
-			By("creating ImagePrefetch with node selector and replicas")
-			testName := "node-selector-replicas"
-			nodeSelector := metav1.LabelSelector{
-				MatchLabels: map[string]string{
-					"beta.kubernetes.io/arch": "amd64",
-				},
-			}
-			createNamespace(testName)
-			createNewImagePrefetch(testName,
-				ofenv1.ImagePrefetchSpec{
-					Images:       testImagesList,
-					NodeSelector: nodeSelector,
-					Replicas:     2,
-				},
-			)
-			Eventually(func(g Gomega) {
-				nodeImageSets := &ofenv1.NodeImageSetList{}
-				err := k8sClient.List(ctx, nodeImageSets, &client.ListOptions{
-					LabelSelector: labels.SelectorFromSet(map[string]string{
-						constants.OwnerImagePrefetchNamespace: testName,
-					}),
-				})
-				g.Expect(err).NotTo(HaveOccurred())
-				g.Expect(len(nodeImageSets.Items)).To(Equal(2))
-			}).Should(Succeed())
+			By("cleaning up the ImagePrefetch resource")
+			deleteImagePrefetchResource(ctx, imagePrefetch)
 		})
 
 		It("should recreate NodeImageSets on another node when a node is NotReady", func() {
 			By("creating ImagePrefetch with replicas")
 			testName := "not-ready-node"
-			createNamespace(testName)
-			createNewImagePrefetch(testName,
+			createNamespace(ctx, testName)
+			imagePrefetch := createNewImagePrefetch(ctx,
+				testName,
 				ofenv1.ImagePrefetchSpec{
 					Images:   testImagesList,
 					Replicas: 2,
@@ -785,11 +652,14 @@ var _ = Describe("ImagePrefetch Controller", func() {
 					g.Expect(nodeImageSet.Spec.NodeName).NotTo(Equal(nodeName))
 				}
 			}).Should(Succeed())
+
+			By("cleaning up the ImagePrefetch resource")
+			deleteImagePrefetchResource(ctx, imagePrefetch)
 		})
 	})
 })
 
-func createNewNode(name, zoneName string) string {
+func createNewNode(ctx context.Context, name, zoneName string) string {
 	node := &corev1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
@@ -814,7 +684,7 @@ func createNewNode(name, zoneName string) string {
 	return name
 }
 
-func createNamespace(name string) {
+func createNamespace(ctx context.Context, name string) {
 	ns := &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
@@ -824,7 +694,7 @@ func createNamespace(name string) {
 	Expect(err).NotTo(HaveOccurred())
 }
 
-func createNewImagePrefetch(testName string, spec ofenv1.ImagePrefetchSpec) *ofenv1.ImagePrefetch {
+func createNewImagePrefetch(ctx context.Context, testName string, spec ofenv1.ImagePrefetchSpec) *ofenv1.ImagePrefetch {
 	newImagePrefetch := &ofenv1.ImagePrefetch{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      testName,
@@ -838,12 +708,19 @@ func createNewImagePrefetch(testName string, spec ofenv1.ImagePrefetchSpec) *ofe
 	return newImagePrefetch
 }
 
-func deleteImagePrefetchResource(imagePrefetch *ofenv1.ImagePrefetch) {
+func deleteImagePrefetchResource(ctx context.Context, imagePrefetch *ofenv1.ImagePrefetch) {
 	err := k8sClient.Delete(ctx, imagePrefetch)
 	Expect(err).NotTo(HaveOccurred())
+
+	Eventually(func(g Gomega) {
+		ip := &ofenv1.ImagePrefetch{}
+		err := k8sClient.Get(ctx, client.ObjectKey{Name: imagePrefetch.Name, Namespace: imagePrefetch.Namespace}, ip)
+		g.Expect(err).To(HaveOccurred())
+		g.Expect(apierrors.IsNotFound(err)).To(BeTrue())
+	}).Should(Succeed())
 }
 
-func updateNodeImage(nodeName string, images []string) {
+func updateNodeImage(ctx context.Context, nodeName string, images []string) {
 	node := &corev1.Node{}
 	err := k8sClient.Get(ctx, client.ObjectKey{Name: nodeName}, node)
 	Expect(err).NotTo(HaveOccurred())

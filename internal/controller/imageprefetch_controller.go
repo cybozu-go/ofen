@@ -105,7 +105,9 @@ func (r *ImagePrefetchReconciler) finalize(ctx context.Context, imgPrefetch *ofe
 	}
 	err := r.DeleteAllOf(ctx, &ofenv1.NodeImageSet{}, opts...)
 	if err != nil {
-		return fmt.Errorf("failed to delete NodeImageSets: %w", err)
+		if !errors.IsNotFound(err) {
+			return fmt.Errorf("failed to delete NodeImageSets: %w", err)
+		}
 	}
 
 	err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
@@ -389,7 +391,8 @@ func (r *ImagePrefetchReconciler) applyNodeImageSetStatus(ctx context.Context, n
 	patch := &unstructured.Unstructured{Object: obj}
 
 	var current ofenv1.NodeImageSet
-	if err := r.Get(ctx, types.NamespacedName{Name: name}, &current); err != nil {
+	err = r.Get(ctx, types.NamespacedName{Name: name}, &current)
+	if !errors.IsNotFound(err) && err != nil {
 		return fmt.Errorf("failed to get NodeImageSet for status update: %w", err)
 	}
 
