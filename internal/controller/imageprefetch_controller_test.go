@@ -580,6 +580,39 @@ var _ = Describe("ImagePrefetch Controller", func() {
 			}).Should(Succeed())
 		})
 
+		It("should create NodeImageSets according to the node selector and allNodes", func() {
+			By("creating ImagePrefetch with node selector and allNodes")
+			testName := "node-selector-all-nodes"
+			nodeSelector := metav1.LabelSelector{
+				MatchExpressions: []metav1.LabelSelectorRequirement{
+					{
+						Key:      "kubernetes.io/hostname",
+						Operator: metav1.LabelSelectorOpExists,
+					},
+				},
+			}
+
+			allNodes := true
+			createNamespace(testName)
+			createNewImagePrefetch(testName,
+				ofenv1.ImagePrefetchSpec{
+					Images:       testImagesList,
+					NodeSelector: nodeSelector,
+					AllNodes:     allNodes,
+				},
+			)
+			Eventually(func(g Gomega) {
+				nodeImageSets := &ofenv1.NodeImageSetList{}
+				err := k8sClient.List(ctx, nodeImageSets, &client.ListOptions{
+					LabelSelector: labels.SelectorFromSet(map[string]string{
+						constants.OwnerImagePrefetchNamespace: testName,
+					}),
+				})
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(len(nodeImageSets.Items)).To(Equal(6))
+			}).Should(Succeed())
+		})
+
 		It("should create NodeImageSets according to the allNodes", func() {
 			By("creating ImagePrefetch with allNodes")
 			testName := "all-nodes"

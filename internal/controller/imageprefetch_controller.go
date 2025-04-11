@@ -116,27 +116,13 @@ func (r *ImagePrefetchReconciler) selectTargetNodes(ctx context.Context, imgPref
 
 	// If NodeSelector is specified, select nodes by NodeSelector
 	if !util.IsLabelSelectorEmpty(&imgPrefetch.Spec.NodeSelector) {
-		nodes, err := r.selectNodesBySelector(ctx, imgPrefetch.Spec.NodeSelector)
+		nodes, err := r.selectNodesBySelector(ctx, imgPrefetch)
 		if err != nil {
 			return nil, err
 		}
+		logger.Info("selected nodes by selector", "nodes", nodes)
 
-		if imgPrefetch.Spec.AllNodes {
-			return getNodeNames(nodes), nil
-		}
-
-		if imgPrefetch.Spec.Replicas > 0 {
-			replicasCount := imgPrefetch.Spec.Replicas
-			if replicasCount > len(nodes) {
-				logger.Info("requested replicas exceeds available nodes",
-					"requested", imgPrefetch.Spec.Replicas,
-					"available", len(nodes))
-				replicasCount = len(nodes)
-			}
-
-			return getNodeNames(nodes[:replicasCount]), nil
-		}
-
+		return nodes, nil
 	}
 
 	if imgPrefetch.Spec.AllNodes {
@@ -159,7 +145,7 @@ func (r *ImagePrefetchReconciler) selectTargetNodes(ctx context.Context, imgPref
 			if err != nil {
 				return nil, fmt.Errorf("failed to select nodes by replicas: %w", err)
 			}
-			logger.Info("selected nodes", "nodes", nodes)
+			logger.Info("selected nodes by replicas", "nodes", nodes)
 
 			return nodes, nil
 		}
@@ -170,17 +156,18 @@ func (r *ImagePrefetchReconciler) selectTargetNodes(ctx context.Context, imgPref
 	return nil, fmt.Errorf("failed to select target nodes")
 }
 
-func (r *ImagePrefetchReconciler) selectNodesBySelector(ctx context.Context, nodeSelector metav1.LabelSelector) ([]corev1.Node, error) {
-	selector, err := metav1.LabelSelectorAsSelector(&nodeSelector)
+func (r *ImagePrefetchReconciler) selectNodesBySelector(ctx context.Context, imgPrefetch *ofenv1.ImagePrefetch) ([]string, error) {
+	selector, err := metav1.LabelSelectorAsSelector(&imgPrefetch.Spec.NodeSelector)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse selector: %w", err)
 	}
 
 	nodes := &corev1.NodeList{}
-	if err := r.List(ctx, nodes, &client.MatchingLabelsSelector{
-		Selector: selector,
-	}); err != nil {
-		return nil, err
+	opts := []client.ListOption{
+		&client.MatchingLabelsSelector{Selector: selector},
+	}
+	if err := r.List(ctx, nodes, opts...); err != nil {
+		return nil, fmt.Errorf("failed to list nodes: %w", err)
 	}
 
 	readyNodes := filterReadyNodes(nodes.Items)
@@ -188,7 +175,18 @@ func (r *ImagePrefetchReconciler) selectNodesBySelector(ctx context.Context, nod
 		return len(readyNodes[i].Status.Images) < len(readyNodes[j].Status.Images)
 	})
 
-	return readyNodes, nil
+	if imgPrefetch.Spec.AllNodes {
+		return getNodeNames(readyNodes), nil
+	}
+
+	if imgPrefetch.Spec.Replicas > 0 {
+		if len(readyNodes) < imgPrefetch.Spec.Replicas {
+			return nil, fmt.Errorf("not enough nodes available: %d < %d", len(readyNodes), imgPrefetch.Spec.Replicas)
+		}
+		return getNodeNames(readyNodes[:imgPrefetch.Spec.Replicas]), nil
+	}
+
+	return nil, fmt.Errorf("no ready nodes match the specified selector")
 }
 
 func filterReadyNodes(nodes []corev1.Node) []corev1.Node {
