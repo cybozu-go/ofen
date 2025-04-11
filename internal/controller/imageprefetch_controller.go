@@ -307,7 +307,6 @@ func (r *ImagePrefetchReconciler) createOrUpdateNodeImageSet(ctx context.Context
 		if err := r.applyNodeImageSetStatus(ctx, nodeImageSet, nodeImageSetName); err != nil {
 			return fmt.Errorf("failed to apply NodeImageSet status: %w", err)
 		}
-
 	}
 
 	// Delete unnecessary NodeImageSets
