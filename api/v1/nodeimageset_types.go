@@ -7,7 +7,7 @@ import (
 
 // NodeImageSetSpec defines the desired state of NodeImageSet
 type NodeImageSetSpec struct {
-	// Images is a list of image sets to be downloaded.
+	// Images is a list of container images to be downloaded.
 	Images []string `json:"images"`
 
 	// Registry Policy is the policy for downloading images from the registry.
