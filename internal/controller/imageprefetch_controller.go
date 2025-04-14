@@ -33,6 +33,7 @@ import (
 	"github.com/cybozu-go/ofen/internal/util"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1apply "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
 // ImagePrefetchReconciler reconciles a ImagePrefetch object
@@ -427,21 +428,14 @@ func getNodeImageSetName(imgPrefetch *ofenv1.ImagePrefetch, nodeName string) str
 
 func (r *ImagePrefetchReconciler) updateStatus(ctx context.Context, imgPrefetch *ofenv1.ImagePrefetch, selectedNodes []string) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
-	imgPrefetch.Status.ObservedGeneration = imgPrefetch.Generation
 	sort.Strings(selectedNodes)
-	imgPrefetch.Status.SelectedNodes = selectedNodes
-	meta.SetStatusCondition(&imgPrefetch.Status.Conditions, metav1.Condition{
-		Type:    ofenv1.ConditionReady,
-		Status:  metav1.ConditionFalse,
-		Reason:  "ImagePrefetchProgressing",
-		Message: "Waiting for all nodes to pull the image",
-	})
-	meta.SetStatusCondition(&imgPrefetch.Status.Conditions, metav1.Condition{
-		Type:    ofenv1.ConditionImagePullFailed,
-		Status:  metav1.ConditionFalse,
-		Reason:  "ImagePrefetchFailed",
-		Message: "Waiting for all nodes to pull the image",
-	})
+	imgPrefetchSSA := ofenv1apply.ImagePrefetch(imgPrefetch.Name, imgPrefetch.Namespace).
+		WithStatus(
+			ofenv1apply.ImagePrefetchStatus().
+				WithObservedGeneration(imgPrefetch.Generation).
+				WithSelectedNodes(selectedNodes...),
+		)
+
 	result := ctrl.Result{RequeueAfter: 10 * time.Second}
 
 	nodeImageSets := &ofenv1.NodeImageSetList{}
@@ -453,42 +447,67 @@ func (r *ImagePrefetchReconciler) updateStatus(ctx context.Context, imgPrefetch 
 	}
 
 	status := calculateStatus(selectedNodes, nodeImageSets, imgPrefetch.Generation)
-	imgPrefetch.Status.DesiredNodes = status.desiredNodes
-	imgPrefetch.Status.ImagePulledNodes = status.availableNodes
-	imgPrefetch.Status.ImagePullingNodes = status.pullingNodes
-	imgPrefetch.Status.ImagePullFailedNodes = status.pullFailedNodes
+	imgPrefetchSSA.Status.WithDesiredNodes(status.desiredNodes)
+	imgPrefetchSSA.Status.WithImagePulledNodes(status.availableNodes)
+	imgPrefetchSSA.Status.WithImagePullingNodes(status.pullingNodes)
+	imgPrefetchSSA.Status.WithImagePullFailedNodes(status.pullFailedNodes)
 
 	if status.availableNodes == status.desiredNodes {
 		logger.Info("ImagePrefetch is ready", "name", imgPrefetch.Name)
-		meta.SetStatusCondition(&imgPrefetch.Status.Conditions, metav1.Condition{
-			Type:    ofenv1.ConditionReady,
-			Status:  metav1.ConditionTrue,
-			Reason:  "ImagePrefetchReady",
-			Message: "All nodes have the desired image",
-		})
+		imgPrefetchSSA.Status.WithConditions(
+			metav1apply.Condition().
+				WithType(ofenv1.ConditionReady).
+				WithStatus(metav1.ConditionTrue).
+				WithReason("ImagePrefetchReady").
+				WithMessage("All nodes have the desired image").
+				WithLastTransitionTime(metav1.Now()),
+			metav1apply.Condition().
+				WithType(ofenv1.ConditionProgressing).
+				WithStatus(metav1.ConditionFalse).
+				WithReason("ImagePrefetchFinished").
+				WithMessage("All nodes have the desired image").
+				WithLastTransitionTime(metav1.Now()),
+		)
 		result = ctrl.Result{}
+	} else {
+		imgPrefetchSSA.Status.WithConditions(
+			metav1apply.Condition().
+				WithType(ofenv1.ConditionReady).
+				WithStatus(metav1.ConditionFalse).
+				WithReason("ImagePrefetchProgressing").
+				WithMessage("Waiting for all nodes to pull the image").
+				WithLastTransitionTime(metav1.Now()),
+			metav1apply.Condition().
+				WithType(ofenv1.ConditionProgressing).
+				WithStatus(metav1.ConditionTrue).
+				WithReason("ImagePrefetchProgressing").
+				WithMessage("Waiting for all nodes to pull the image").
+				WithLastTransitionTime(metav1.Now()),
+		)
 	}
 
 	if status.pullFailedNodes > 0 {
-		meta.SetStatusCondition(&imgPrefetch.Status.Conditions, metav1.Condition{
-			Type:    ofenv1.ConditionImagePullFailed,
-			Status:  metav1.ConditionTrue,
-			Reason:  "ImagePrefetchFailed",
-			Message: "some nodes failed to pull the image",
-		})
+		imgPrefetchSSA.Status.WithConditions(
+			metav1apply.Condition().
+				WithType(ofenv1.ConditionImagePullFailed).
+				WithStatus(metav1.ConditionTrue).
+				WithReason("ImagePrefetchFailed").
+				WithMessage("Some nodes failed to pull the image").
+				WithLastTransitionTime(metav1.Now()),
+		)
 	} else {
-		meta.SetStatusCondition(&imgPrefetch.Status.Conditions, metav1.Condition{
-			Type:    ofenv1.ConditionProgressing,
-			Status:  metav1.ConditionTrue,
-			Reason:  "ImagePrefetchProgressing",
-			Message: "Waiting for all nodes to pull the image",
-		})
+		imgPrefetchSSA.Status.WithConditions(
+			metav1apply.Condition().
+				WithType(ofenv1.ConditionImagePullFailed).
+				WithStatus(metav1.ConditionFalse).
+				WithReason("NoImagePullFailed").
+				WithMessage("No nodes have failed to pull the image").
+				WithLastTransitionTime(metav1.Now()),
+		)
 	}
 
-	err := r.Status().Update(ctx, imgPrefetch)
-	if err != nil {
-		logger.Error(err, "failed to update ImagePrefetch status")
-		return ctrl.Result{}, err
+	if err := r.applyImagePrefetchStatus(ctx, imgPrefetchSSA, imgPrefetch.Name); err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to update ImagePrefetch status: %w", err)
 	}
 
 	return result, nil
@@ -525,6 +544,31 @@ func calculateStatus(selectNodes []string, nodeImageSets *ofenv1.NodeImageSetLis
 	}
 
 	return status
+}
+
+func (r *ImagePrefetchReconciler) applyImagePrefetchStatus(ctx context.Context, imgPrefetch *ofenv1apply.ImagePrefetchApplyConfiguration, name string) error {
+	obj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(imgPrefetch)
+	if err != nil {
+		return fmt.Errorf("failed to convert ImagePrefetch status: %w", err)
+	}
+	patch := &unstructured.Unstructured{Object: obj}
+
+	var current ofenv1.ImagePrefetch
+	err = r.Get(ctx, types.NamespacedName{Name: name}, &current)
+	if !errors.IsNotFound(err) && err != nil {
+		return fmt.Errorf("failed to get ImagePrefetch for status update: %w", err)
+	}
+
+	currentStatusApplyConfig, err := ofenv1apply.ExtractImagePrefetchStatus(&current, constants.ImagePrefetchFieldManager)
+	if err != nil {
+		return fmt.Errorf("failed to extract ImagePrefetch status: %w", err)
+	}
+
+	if equality.Semantic.DeepEqual(currentStatusApplyConfig, imgPrefetch) {
+		return nil
+	}
+
+	return r.Status().Patch(ctx, patch, client.Apply, client.ForceOwnership, client.FieldOwner(constants.ImagePrefetchFieldManager))
 }
 
 // SetupWithManager sets up the controller with the Manager.
