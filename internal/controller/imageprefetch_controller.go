@@ -16,6 +16,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/util/retry"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
@@ -107,8 +108,26 @@ func (r *ImagePrefetchReconciler) finalize(ctx context.Context, imgPrefetch *ofe
 		return fmt.Errorf("failed to delete NodeImageSets: %w", err)
 	}
 
-	controllerutil.RemoveFinalizer(imgPrefetch, constants.ImagePrefetchFinalizer)
-	return r.Update(ctx, imgPrefetch)
+	err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		var current ofenv1.ImagePrefetch
+		if err := r.Get(ctx, client.ObjectKey{Namespace: imgPrefetch.Namespace, Name: imgPrefetch.Name}, &current); err != nil {
+			if errors.IsNotFound(err) {
+				return nil
+			}
+
+			return err
+		}
+		if !controllerutil.ContainsFinalizer(&current, constants.ImagePrefetchFinalizer) {
+			return nil
+		}
+		controllerutil.RemoveFinalizer(&current, constants.ImagePrefetchFinalizer)
+		return r.Update(ctx, &current)
+	})
+	if err != nil {
+		return fmt.Errorf("failed to remove finalizer: %w", err)
+	}
+
+	return nil
 }
 
 func (r *ImagePrefetchReconciler) selectTargetNodes(ctx context.Context, imgPrefetch *ofenv1.ImagePrefetch) ([]string, error) {
@@ -463,7 +482,13 @@ func (r *ImagePrefetchReconciler) updateStatus(ctx context.Context, imgPrefetch 
 		})
 	}
 
-	return result, r.Status().Update(ctx, imgPrefetch)
+	err := r.Status().Update(ctx, imgPrefetch)
+	if err != nil {
+		logger.Error(err, "failed to update ImagePrefetch status")
+		return ctrl.Result{}, err
+	}
+
+	return result, nil
 }
 
 type NodeImageSetStatus struct {
