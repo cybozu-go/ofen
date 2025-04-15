@@ -89,6 +89,16 @@ func prepareObjects(ctx context.Context) error {
 	return nil
 }
 
+func deleteAllNodes(ctx context.Context) {
+	nodes := &corev1.NodeList{}
+	err := k8sClient.List(ctx, nodes)
+	Expect(err).NotTo(HaveOccurred())
+	for _, node := range nodes.Items {
+		err = k8sClient.Delete(ctx, &node)
+		Expect(err).NotTo(HaveOccurred())
+	}
+}
+
 var _ = Describe("ImagePrefetch Controller", func() {
 	Context("When reconciling a resource", func() {
 		ctx := context.Background()
@@ -667,7 +677,7 @@ var _ = Describe("ImagePrefetch Controller", func() {
 			deleteImagePrefetchResource(ctx, imagePrefetch)
 		})
 
-		It("should increase or decrease the number of NodeImageSets when nodes are added or removed", func() {
+		It("should increase or decrease the number of NodeImageSets when node are added or removed", func() {
 			By("creating ImagePrefetch with node selector")
 			testName := "add-remove-node"
 			nodeSelector := metav1.LabelSelector{
@@ -733,6 +743,9 @@ var _ = Describe("ImagePrefetch Controller", func() {
 
 			By("cleaning up the ImagePrefetch resource")
 			deleteImagePrefetchResource(ctx, imagePrefetch)
+
+			By("cleaning up the new node")
+			deleteAllNodes(ctx)
 		})
 
 		It("should recreate NodeImageSets on another node when a node is NotReady", func() {
@@ -795,6 +808,66 @@ var _ = Describe("ImagePrefetch Controller", func() {
 
 			By("cleaning up the ImagePrefetch resource")
 			deleteImagePrefetchResource(ctx, imagePrefetch)
+
+			By("cleaning up the new node")
+			deleteAllNodes(ctx)
+		})
+
+		It("should not include not ready node when one node is NotReady", func() {
+			By("creating a node in NotReady state")
+			notReadyNodeName := fmt.Sprintf("%s-8", nodePrefix)
+			createNewNode(ctx, notReadyNodeName, "rack0")
+
+			node := &corev1.Node{}
+			err := k8sClient.Get(ctx, client.ObjectKey{Name: notReadyNodeName}, node)
+			Expect(err).NotTo(HaveOccurred())
+			node.Status.Conditions = []corev1.NodeCondition{
+				{
+					Type:   corev1.NodeReady,
+					Status: corev1.ConditionFalse,
+				},
+			}
+			err = k8sClient.Status().Update(ctx, node)
+			Expect(err).NotTo(HaveOccurred())
+
+			By("creating ImagePrefetch with nodeSelector and allNodes")
+			testName := "selector-all-nodes-not-ready"
+			nodeSelector := metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"topology.kubernetes.io/zone": "rack0",
+				},
+			}
+
+			createNamespace(ctx, testName)
+			imagePrefetch := createNewImagePrefetch(ctx, testName,
+				ofenv1.ImagePrefetchSpec{
+					Images:       testImagesList,
+					NodeSelector: nodeSelector,
+					AllNodes:     true,
+				},
+			)
+
+			By("checking that NotReady node is not included in NodeImageSets")
+			Eventually(func(g Gomega) {
+				nodeImageSets := &ofenv1.NodeImageSetList{}
+				err := k8sClient.List(ctx, nodeImageSets, &client.ListOptions{
+					LabelSelector: labels.SelectorFromSet(map[string]string{
+						constants.OwnerImagePrefetchNamespace: testName,
+					}),
+				})
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(nodeImageSets.Items).To(HaveLen(4))
+
+				for _, nodeImageSet := range nodeImageSets.Items {
+					g.Expect(nodeImageSet.Spec.NodeName).NotTo(Equal(notReadyNodeName))
+				}
+			}).Should(Succeed())
+
+			By("cleaning up the ImagePrefetch resource")
+			deleteImagePrefetchResource(ctx, imagePrefetch)
+
+			By("cleaning up the new node")
+			deleteAllNodes(ctx)
 		})
 	})
 })
