@@ -136,11 +136,7 @@ func (r *ImagePrefetchReconciler) selectTargetNodes(ctx context.Context, imgPref
 	}
 
 	if imgPrefetch.Spec.Replicas > 0 {
-		needsNodeSelection, err := isNeedNodeSelection(ctx, imgPrefetch, readyNodes)
-		if err != nil {
-			return nil, err
-		}
-
+		needsNodeSelection := isNeedNodeSelection(ctx, imgPrefetch, readyNodes)
 		if needsNodeSelection {
 			nodes, err := selectNodesByReplicas(ctx, imgPrefetch, readyNodes)
 			if err != nil {
@@ -167,13 +163,13 @@ func filterReadyNodes(nodes []corev1.Node) []corev1.Node {
 	return readyNodes
 }
 
-func isNeedNodeSelection(ctx context.Context, imgPrefetch *ofenv1.ImagePrefetch, readyNodes []corev1.Node) (bool, error) {
+func isNeedNodeSelection(ctx context.Context, imgPrefetch *ofenv1.ImagePrefetch, readyNodes []corev1.Node) bool {
 	if len(imgPrefetch.Status.SelectedNodes) == 0 {
-		return true, nil
+		return true
 	}
 
 	if imgPrefetch.Generation != imgPrefetch.Status.ObservedGeneration {
-		return true, nil
+		return true
 	}
 
 	readyNodesName := getNodeNames(readyNodes)
@@ -185,7 +181,7 @@ func isNeedNodeSelection(ctx context.Context, imgPrefetch *ofenv1.ImagePrefetch,
 		}
 	}
 
-	return containUnhealthyNodes, nil
+	return containUnhealthyNodes
 }
 
 func getNodeNames(nodes []corev1.Node) []string {
