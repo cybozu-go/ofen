@@ -137,13 +137,15 @@ var _ = Describe("NodeImageSet Controller", Serial, func() {
 
 		It("should pull images as specified in the NodeImageSet", func() {
 			testName := "test-nodeimageset"
+			image := fmt.Sprintf("test/%s:latest", testName)
 			By("creating a NodeImageSet resource")
 			nodeImageSet := createNodeImageSet(testName).
 				WithLabels(map[string]string{
 					constants.NodeName: nodeName,
 				}).
 				withNodeName(nodeName).
-				withImages([]string{fmt.Sprintf("test/%s:latest", testName)}).
+				withImages([]string{image}).
+				withRegistryPolicy(ofenv1.RegistryPolicyDefault).
 				build()
 			err := k8sClient.Create(ctx, nodeImageSet)
 			Expect(err).NotTo(HaveOccurred())
@@ -167,13 +169,15 @@ var _ = Describe("NodeImageSet Controller", Serial, func() {
 
 		It("should delete the NodeImageSet resource when its associated Node is deleted", func() {
 			testName := "should-delete-nodeimageset"
+			image := fmt.Sprintf("test/%s:latest", testName)
 			By("creating a NodeImageSet resource")
 			nodeImageSet := createNodeImageSet(testName).
 				WithLabels(map[string]string{
 					constants.NodeName: nodeName,
 				}).
 				withNodeName(nodeName).
-				withImages([]string{fmt.Sprintf("test/%s:latest", testName)}).
+				withImages([]string{image}).
+				withRegistryPolicy(ofenv1.RegistryPolicyDefault).
 				build()
 			err := k8sClient.Create(ctx, nodeImageSet)
 			Expect(err).NotTo(HaveOccurred())
@@ -212,6 +216,7 @@ var _ = Describe("NodeImageSet Controller", Serial, func() {
 				}).
 				withNodeName(nodeName).
 				withImages([]string{image1, image2}).
+				withRegistryPolicy(ofenv1.RegistryPolicyDefault).
 				build()
 			err := k8sClient.Create(ctx, nodeImageSet)
 			Expect(err).NotTo(HaveOccurred())
@@ -269,6 +274,7 @@ var _ = Describe("NodeImageSet Controller", Serial, func() {
 				// this controller instance only processes NodeImageSets for its assigned node.
 				withNodeName("other-node").
 				withImages([]string{image}).
+				withRegistryPolicy(ofenv1.RegistryPolicyDefault).
 				build()
 			err := k8sClient.Create(ctx, nodeImageSet)
 			Expect(err).NotTo(HaveOccurred())
@@ -296,6 +302,7 @@ var _ = Describe("NodeImageSet Controller", Serial, func() {
 				}).
 				withNodeName(nodeName).
 				withImages([]string{image}).
+				withRegistryPolicy(ofenv1.RegistryPolicyDefault).
 				build()
 			err := k8sClient.Create(ctx, nodeImageSet)
 			Expect(err).NotTo(HaveOccurred())
@@ -333,6 +340,7 @@ var _ = Describe("NodeImageSet Controller", Serial, func() {
 				}).
 				withNodeName(nodeName).
 				withImages([]string{image}).
+				withRegistryPolicy(ofenv1.RegistryPolicyDefault).
 				build()
 			err := k8sClient.Create(ctx, nodeImageSet)
 			Expect(err).NotTo(HaveOccurred())
@@ -363,6 +371,7 @@ var _ = Describe("NodeImageSet Controller", Serial, func() {
 				}).
 				withNodeName(nodeName).
 				withImages([]string{image1, image2}).
+				withRegistryPolicy(ofenv1.RegistryPolicyDefault).
 				build()
 			err := k8sClient.Create(ctx, nodeImageSet)
 			Expect(err).NotTo(HaveOccurred())

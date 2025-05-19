@@ -2,7 +2,9 @@ package controller
 
 import (
 	"context"
+	"fmt"
 
+	ofenv1 "github.com/cybozu-go/ofen/api/v1" // Add this import
 	"github.com/cybozu-go/ofen/internal/imgmanager"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -53,10 +55,14 @@ var _ = Describe("ImagePuller", func() {
 		})
 
 		It("should pull image successfully", func() {
+			testName := "test-image-puller"
+			image := fmt.Sprintf("%s:latest", testName)
+
 			By("creating a NodeImageSet")
-			nis := createNodeImageSet("test-image-puller").
+			nis := createNodeImageSet(testName).
 				withNodeName(nodeName).
-				withImages([]string{"test/image-puller:latest"}).
+				withImages([]string{image}).
+				withRegistryPolicy(ofenv1.RegistryPolicyDefault).
 				build()
 
 			By("starting the image pull process")
@@ -75,7 +81,7 @@ var _ = Describe("ImagePuller", func() {
 			By("checking image is pulled")
 			Eventually(func(g Gomega) {
 				{
-					exists, err := fakeContainerdClient.IsImageExists(ctx, "test/image-puller:latest")
+					exists, err := fakeContainerdClient.IsImageExists(ctx, image)
 					g.Expect(err).NotTo(HaveOccurred())
 					g.Expect(exists).To(BeTrue())
 				}
