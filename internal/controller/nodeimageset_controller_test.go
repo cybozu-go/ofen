@@ -137,7 +137,7 @@ var _ = Describe("NodeImageSet Controller", Serial, func() {
 
 		It("should pull images as specified in the NodeImageSet", func() {
 			testName := "test-nodeimageset"
-			image := fmt.Sprintf("test/%s:latest", testName)
+			image := fmt.Sprintf("test/%s/image:latest", testName)
 			By("creating a NodeImageSet resource")
 			nodeImageSet := createNodeImageSet(testName).
 				WithLabels(map[string]string{
@@ -169,7 +169,7 @@ var _ = Describe("NodeImageSet Controller", Serial, func() {
 
 		It("should delete the NodeImageSet resource when its associated Node is deleted", func() {
 			testName := "should-delete-nodeimageset"
-			image := fmt.Sprintf("test/%s:latest", testName)
+			image := fmt.Sprintf("test/%s/image:latest", testName)
 			By("creating a NodeImageSet resource")
 			nodeImageSet := createNodeImageSet(testName).
 				WithLabels(map[string]string{
@@ -206,8 +206,8 @@ var _ = Describe("NodeImageSet Controller", Serial, func() {
 
 		It("should reconcile the NodeImageSet when the count of images on the Node changes", func() {
 			testName := "reconcile-on-node-image-num-change"
-			image1 := fmt.Sprintf("test/%s-image1:latest", testName)
-			image2 := fmt.Sprintf("test/%s-image2:latest", testName)
+			image1 := fmt.Sprintf("test/%s/image1:latest", testName)
+			image2 := fmt.Sprintf("test/%s/image2:latest", testName)
 
 			By("creating a NodeImageSet resource with two images")
 			nodeImageSet := createNodeImageSet(testName).
@@ -261,7 +261,7 @@ var _ = Describe("NodeImageSet Controller", Serial, func() {
 
 		It("should not reconcile NodeImageSets intended for other nodes", func() {
 			testName := "no-reconcile-on-node-name-mismatch"
-			image := fmt.Sprintf("test/%s-image:latest", testName)
+			image := fmt.Sprintf("test/%s/image:latest", testName)
 
 			By("creating a NodeImageSet resource for a different node")
 			nodeImageSet := createNodeImageSet(testName).
@@ -294,7 +294,7 @@ var _ = Describe("NodeImageSet Controller", Serial, func() {
 
 		It("should update NodeImageSet status based on the actual image availability on the node", func() {
 			testName := "update-status-on-node-status-change"
-			image := fmt.Sprintf("test/%s-image:latest", testName)
+			image := fmt.Sprintf("test/%s/image:latest", testName)
 			By("creating a NodeImageSet resource with one image")
 			nodeImageSet := createNodeImageSet(testName).
 				WithLabels(map[string]string{
@@ -330,7 +330,7 @@ var _ = Describe("NodeImageSet Controller", Serial, func() {
 
 		It("should increment DownloadFailedImages when an image pull fails", func() {
 			testName := "update-status-on-image-pull-fail"
-			image := fmt.Sprintf("test/%s:latest", testName)
+			image := fmt.Sprintf("test/%s/image:latest", testName)
 			fakeContainerdClient.RegisterImagePullError(image, errdefs.ErrUnavailable)
 
 			By("creating a NodeImageSet resource with one image")
@@ -360,8 +360,8 @@ var _ = Describe("NodeImageSet Controller", Serial, func() {
 
 		It("should increment DownloadFailedImages when an image is not found and RegistryPolicy is not MirrorOnly", func() {
 			testName := "update-status-on-image-pull-not-found"
-			image1 := fmt.Sprintf("test/%s:latest", testName)
-			image2 := fmt.Sprintf("test/%s:not-found-image", testName)
+			image1 := fmt.Sprintf("test/%s/image1:latest", testName)
+			image2 := fmt.Sprintf("test/%s/image2:not-found", testName)
 			fakeContainerdClient.RegisterImagePullError(image2, errdefs.ErrNotFound)
 
 			By("creating a NodeImageSet resource with two images")
@@ -391,8 +391,8 @@ var _ = Describe("NodeImageSet Controller", Serial, func() {
 
 		It("should not increment DownloadFailedImages for a not-found error when RegistryPolicy is MirrorOnly", func() {
 			testName := "update-status-on-image-pull-not-found-mirror-only"
-			image1 := fmt.Sprintf("test/%s:latest", testName) // Assume this image pulls successfully
-			image2 := fmt.Sprintf("test/%s:not-found-image", testName)
+			image1 := fmt.Sprintf("test/%s/image1:latest", testName) // Assume this image pulls successfully
+			image2 := fmt.Sprintf("test/%s/image2:not-found", testName)
 			fakeContainerdClient.RegisterImagePullError(image2, errdefs.ErrNotFound)
 
 			By("creating a NodeImageSet resource with two images and MirrorOnly policy")
