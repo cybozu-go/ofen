@@ -181,6 +181,7 @@ var _ = Describe("NodeImageSet Controller", Serial, func() {
 				build()
 			err := k8sClient.Create(ctx, nodeImageSet)
 			Expect(err).NotTo(HaveOccurred())
+
 			Eventually(func(g Gomega) {
 				nodeImageSet := &ofenv1.NodeImageSet{}
 				err := k8sClient.Get(ctx, client.ObjectKey{Name: testName}, nodeImageSet)
@@ -266,12 +267,8 @@ var _ = Describe("NodeImageSet Controller", Serial, func() {
 			By("creating a NodeImageSet resource for a different node")
 			nodeImageSet := createNodeImageSet(testName).
 				WithLabels(map[string]string{
-					// The constants.NodeName label is used by the controller's watch on Node objects
-					// to enqueue relevant NodeImageSets if a Node changes.
 					constants.NodeName: "other-node",
 				}).
-				// The spec.NodeName field is used by the Reconcile method to ensure
-				// this controller instance only processes NodeImageSets for its assigned node.
 				withNodeName("other-node").
 				withImages([]string{image}).
 				withRegistryPolicy(ofenv1.RegistryPolicyDefault).
@@ -306,6 +303,7 @@ var _ = Describe("NodeImageSet Controller", Serial, func() {
 				build()
 			err := k8sClient.Create(ctx, nodeImageSet)
 			Expect(err).NotTo(HaveOccurred())
+
 			Eventually(func(g Gomega) {
 				currentNis := &ofenv1.NodeImageSet{}
 				err := k8sClient.Get(ctx, client.ObjectKey{Name: testName}, currentNis)
