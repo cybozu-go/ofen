@@ -46,6 +46,11 @@ func (b *nodeImageSetBuilder) withImages(images []string) *nodeImageSetBuilder {
 	return b
 }
 
+func (b *nodeImageSetBuilder) withRegistryPolicy(policy ofenv1.RegistryPolicy) *nodeImageSetBuilder {
+	b.object.Spec.RegistryPolicy = policy
+	return b
+}
+
 func (b *nodeImageSetBuilder) WithLabels(labels map[string]string) *nodeImageSetBuilder {
 	b.object.Labels = labels
 	return b
@@ -130,7 +135,7 @@ var _ = Describe("NodeImageSet Controller", Serial, func() {
 			time.Sleep(100 * time.Millisecond)
 		})
 
-		It("should pull image according to NodeImageSet", func() {
+		It("should pull images as specified in the NodeImageSet", func() {
 			testName := "test-nodeimageset"
 			By("creating a NodeImageSet resource")
 			nodeImageSet := createNodeImageSet(testName).
@@ -160,7 +165,7 @@ var _ = Describe("NodeImageSet Controller", Serial, func() {
 			deleteNodeImageSet(ctx, testName)
 		})
 
-		It("should delete the NodeImageSet resource if node being deleted", func() {
+		It("should delete the NodeImageSet resource when its associated Node is deleted", func() {
 			testName := "should-delete-nodeimageset"
 			By("creating a NodeImageSet resource")
 			nodeImageSet := createNodeImageSet(testName).
@@ -195,7 +200,7 @@ var _ = Describe("NodeImageSet Controller", Serial, func() {
 			}).Should(Succeed())
 		})
 
-		It("should reconcile NodeImageSet resource if the number of images on the node changes", func() {
+		It("should reconcile the NodeImageSet when the count of images on the Node changes", func() {
 			testName := "reconcile-on-node-image-num-change"
 			image1 := fmt.Sprintf("test/%s-image1:latest", testName)
 			image2 := fmt.Sprintf("test/%s-image2:latest", testName)
@@ -249,22 +254,26 @@ var _ = Describe("NodeImageSet Controller", Serial, func() {
 			deleteNodeImageSet(ctx, testName)
 		})
 
-		It("should not reconcile NodeImageSet resource if the node name does not match", func() {
+		It("should not reconcile NodeImageSets intended for other nodes", func() {
 			testName := "no-reconcile-on-node-name-mismatch"
 			image := fmt.Sprintf("test/%s-image:latest", testName)
 
-			By("creating a NodeImageSet resource with two images")
+			By("creating a NodeImageSet resource for a different node")
 			nodeImageSet := createNodeImageSet(testName).
 				WithLabels(map[string]string{
+					// The constants.NodeName label is used by the controller's watch on Node objects
+					// to enqueue relevant NodeImageSets if a Node changes.
 					constants.NodeName: "other-node",
 				}).
+				// The spec.NodeName field is used by the Reconcile method to ensure
+				// this controller instance only processes NodeImageSets for its assigned node.
 				withNodeName("other-node").
 				withImages([]string{image}).
 				build()
 			err := k8sClient.Create(ctx, nodeImageSet)
 			Expect(err).NotTo(HaveOccurred())
 
-			By("waiting for initial reconciliation and for both images to be available")
+			By("checking that the NodeImageSet status remains unchanged by this controller")
 			Eventually(func(g Gomega) {
 				currentNis := &ofenv1.NodeImageSet{}
 				err := k8sClient.Get(ctx, client.ObjectKey{Name: testName}, currentNis)
@@ -277,7 +286,7 @@ var _ = Describe("NodeImageSet Controller", Serial, func() {
 			deleteNodeImageSet(ctx, testName)
 		})
 
-		It("should update NodeImageSet status according to the node's status", func() {
+		It("should update NodeImageSet status based on the actual image availability on the node", func() {
 			testName := "update-status-on-node-status-change"
 			image := fmt.Sprintf("test/%s-image:latest", testName)
 			By("creating a NodeImageSet resource with one image")
@@ -312,7 +321,7 @@ var _ = Describe("NodeImageSet Controller", Serial, func() {
 			deleteNodeImageSet(ctx, testName)
 		})
 
-		It("should increase failed image if the image pull fail", func() {
+		It("should increment DownloadFailedImages when an image pull fails", func() {
 			testName := "update-status-on-image-pull-fail"
 			image := fmt.Sprintf("test/%s:latest", testName)
 			fakeContainerdClient.RegisterImagePullError(image, errdefs.ErrUnavailable)
@@ -341,7 +350,7 @@ var _ = Describe("NodeImageSet Controller", Serial, func() {
 			deleteNodeImageSet(ctx, testName)
 		})
 
-		It("should not increment failed count if the image pull is not found", func() {
+		It("should increment DownloadFailedImages when an image is not found and RegistryPolicy is not MirrorOnly", func() {
 			testName := "update-status-on-image-pull-not-found"
 			image1 := fmt.Sprintf("test/%s:latest", testName)
 			image2 := fmt.Sprintf("test/%s:not-found-image", testName)
@@ -365,6 +374,37 @@ var _ = Describe("NodeImageSet Controller", Serial, func() {
 				g.Expect(currentNis.Status.DesiredImages).To(Equal(2))
 				g.Expect(currentNis.Status.AvailableImages).To(Equal(1))
 				g.Expect(currentNis.Status.DownloadFailedImages).To(Equal(1))
+			}).Should(Succeed())
+
+			By("cleaning up the NodeImageSet resource")
+			deleteNodeImageSet(ctx, testName)
+		})
+
+		It("should not increment DownloadFailedImages for a not-found error when RegistryPolicy is MirrorOnly", func() {
+			testName := "update-status-on-image-pull-not-found-mirror-only"
+			image1 := fmt.Sprintf("test/%s:latest", testName) // Assume this image pulls successfully
+			image2 := fmt.Sprintf("test/%s:not-found-image", testName)
+			fakeContainerdClient.RegisterImagePullError(image2, errdefs.ErrNotFound)
+
+			By("creating a NodeImageSet resource with two images and MirrorOnly policy")
+			nodeImageSet := createNodeImageSet(testName).
+				WithLabels(map[string]string{
+					constants.NodeName: nodeName,
+				}).
+				withNodeName(nodeName).
+				withImages([]string{image1, image2}).
+				withRegistryPolicy(ofenv1.RegistryPolicyMirrorOnly).
+				build()
+			err := k8sClient.Create(ctx, nodeImageSet)
+			Expect(err).NotTo(HaveOccurred())
+
+			Eventually(func(g Gomega) {
+				currentNis := &ofenv1.NodeImageSet{}
+				err := k8sClient.Get(ctx, client.ObjectKey{Name: testName}, currentNis)
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(currentNis.Status.DesiredImages).To(Equal(2))
+				g.Expect(currentNis.Status.AvailableImages).To(Equal(1))      // image1 is available
+				g.Expect(currentNis.Status.DownloadFailedImages).To(Equal(0)) // image2 not found with MirrorOnly should not count as failed
 			}).Should(Succeed())
 
 			By("cleaning up the NodeImageSet resource")
