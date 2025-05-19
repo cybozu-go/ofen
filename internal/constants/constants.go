@@ -10,6 +10,10 @@ const (
 	OwnerImagePrefetchName      = ImagePrefetchPrefix + "owner-name"
 )
 
+const NodeImageSetPrefix = "nodeimageset.ofen.cybozu.io/"
+
 const (
-	NodeImageSetPrefix = "nodeimageset"
+	NodeImageSetNamePrefix   = "nodeimageset"
+	NodeImageSetFinalizer    = NodeImageSetPrefix + "finalizer"
+	NodeImageSetFieldManager = NodeImageSetPrefix + "nodeimageset-controller"
 )
