@@ -14,6 +14,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
@@ -45,7 +46,7 @@ type ImagePrefetchReconciler struct {
 // +kubebuilder:rbac:groups=ofen.cybozu.io,resources=imageprefetches,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=ofen.cybozu.io,resources=imageprefetches/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=ofen.cybozu.io,resources=imageprefetches/finalizers,verbs=update
-// +kubebuilder:rbac:groups=ofen.cybozu.io,resources=nodeimagesets,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=ofen.cybozu.io,resources=nodeimagesets,verbs=get;list;watch;create;update;patch;delete;deletecollection
 // +kubebuilder:rbac:groups=core,resources=nodes,verbs=get;list;watch
 
 func (r *ImagePrefetchReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -528,6 +529,8 @@ func (r *ImagePrefetchReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 	nodeHandler := handler.EnqueueRequestsFromMapFunc(
 		func(ctx context.Context, obj client.Object) []ctrl.Request {
+			logger := log.FromContext(ctx)
+			logger.V(2).Info("Node event received", "node", obj.GetName())
 			node := obj.(*corev1.Node)
 			imagePrefetchList := &ofenv1.ImagePrefetchList{}
 			err := r.List(ctx, imagePrefetchList)
@@ -537,6 +540,29 @@ func (r *ImagePrefetchReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 			var requests []ctrl.Request
 			for _, imgPrefetch := range imagePrefetchList.Items {
+				if imgPrefetch.Spec.AllNodes {
+					if util.IsLabelSelectorEmpty(&imgPrefetch.Spec.NodeSelector) {
+						requests = append(requests, ctrl.Request{
+							NamespacedName: types.NamespacedName{
+								Namespace: imgPrefetch.Namespace,
+								Name:      imgPrefetch.Name,
+							},
+						})
+						continue
+					}
+
+					selector, _ := metav1.LabelSelectorAsSelector(&imgPrefetch.Spec.NodeSelector)
+					if selector.Matches(labels.Set(node.Labels)) {
+						requests = append(requests, ctrl.Request{
+							NamespacedName: types.NamespacedName{
+								Namespace: imgPrefetch.Namespace,
+								Name:      imgPrefetch.Name,
+							},
+						})
+					}
+					continue
+				}
+
 				if slices.Contains(imgPrefetch.Status.SelectedNodes, node.Name) {
 					requests = append(requests, ctrl.Request{
 						NamespacedName: types.NamespacedName{
@@ -557,6 +583,9 @@ func (r *ImagePrefetchReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			nodeImageSetHandler,
 			builder.WithPredicates(
 				predicate.Funcs{
+					CreateFunc: func(e event.CreateEvent) bool {
+						return false
+					},
 					UpdateFunc: func(e event.UpdateEvent) bool {
 						return true
 					},
@@ -573,6 +602,20 @@ func (r *ImagePrefetchReconciler) SetupWithManager(mgr ctrl.Manager) error {
 				predicate.Funcs{
 					CreateFunc: func(e event.CreateEvent) bool {
 						return true
+					},
+					UpdateFunc: func(e event.UpdateEvent) bool {
+						oldNode := e.ObjectOld.(*corev1.Node)
+						newNode := e.ObjectNew.(*corev1.Node)
+						// change node status from not ready to ready
+						if !util.IsNodeReady(oldNode) && util.IsNodeReady(newNode) {
+							return true
+						}
+						// change node status from ready to not ready
+						if util.IsNodeReady(oldNode) && !util.IsNodeReady(newNode) {
+							return true
+						}
+
+						return false
 					},
 					DeleteFunc: func(e event.DeleteEvent) bool {
 						return true

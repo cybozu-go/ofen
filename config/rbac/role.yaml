@@ -16,7 +16,6 @@ rules:
   - ofen.cybozu.io
   resources:
   - imageprefetches
-  - nodeimagesets
   verbs:
   - create
   - delete
@@ -41,3 +40,16 @@ rules:
   - get
   - patch
   - update
+- apiGroups:
+  - ofen.cybozu.io
+  resources:
+  - nodeimagesets
+  verbs:
+  - create
+  - delete
+  - deletecollection
+  - get
+  - list
+  - patch
+  - update
+  - watch
