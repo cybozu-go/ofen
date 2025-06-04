@@ -8,6 +8,8 @@ const (
 	NodeName                    = ImagePrefetchPrefix + "node-name"
 	OwnerImagePrefetchNamespace = ImagePrefetchPrefix + "owner-namespace"
 	OwnerImagePrefetchName      = ImagePrefetchPrefix + "owner-name"
+	NoZoneName                  = "no-zone"
+	MaxZoneScore                = 100
 )
 
 const NodeImageSetPrefix = "nodeimageset.ofen.cybozu.io/"

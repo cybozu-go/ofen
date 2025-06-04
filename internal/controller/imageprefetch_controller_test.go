@@ -302,7 +302,7 @@ var _ = Describe("ImagePrefetch Controller", Serial, func() {
 			deleteImagePrefetchResource(ctx, imagePrefetch)
 		})
 
-		It("Should delete NodeImageSets when the ImagePrefetch resource is deleted", func() {
+		It("should delete NodeImageSets when the ImagePrefetch resource is deleted", func() {
 			By("creating a new ImagePrefetch with replicas")
 
 			testName := "confirm-delete-node-image-set"
@@ -340,7 +340,7 @@ var _ = Describe("ImagePrefetch Controller", Serial, func() {
 			}).Should(Succeed())
 		})
 
-		It("Should match node names in NodeImageSets with those in ImagePrefetch Status SelectedNodes", func() {
+		It("should match node names in NodeImageSets with those in ImagePrefetch Status SelectedNodes", func() {
 			By("creating a new ImagePrefetch with replicas")
 			testName := "image-prefetch-status"
 			replicas := 4
@@ -380,28 +380,13 @@ var _ = Describe("ImagePrefetch Controller", Serial, func() {
 			deleteImagePrefetchResource(ctx, imagePrefetch)
 		})
 
-		It("should create NodeImageSet on the node with the fewest images", func() {
-			By("increasing the images included in the nodes")
-			node0 := fmt.Sprintf("%s-0", nodePrefix)
-			node1 := fmt.Sprintf("%s-1", nodePrefix)
-			node2 := fmt.Sprintf("%s-2", nodePrefix)
-			for i := 0; i < 10; i++ {
-				updateNodeImage(ctx, node0, []string{fmt.Sprintf("dummy/%d", i)})
-				updateNodeImage(ctx, node1, []string{fmt.Sprintf("dummy/%d", i)})
-				updateNodeImage(ctx, node2, []string{fmt.Sprintf("dummy/%d", i)})
-			}
-
+		It("should create NodeImageSet for the each failure domains", func() {
 			By("creating imagePrefetch with replicas")
-			testName := "fewest-images"
+			testName := "failure-domains"
 			createNamespace(ctx, testName)
-			replicas := 1
+			replicas := 3
 			imagePrefetch := createNewImagePrefetch(ctx, testName, ofenv1.ImagePrefetchSpec{
-				Images: testImagesList,
-				NodeSelector: metav1.LabelSelector{
-					MatchLabels: map[string]string{
-						"topology.kubernetes.io/zone": "rack0",
-					},
-				},
+				Images:   testImagesList,
 				Replicas: replicas,
 			})
 
@@ -414,7 +399,18 @@ var _ = Describe("ImagePrefetch Controller", Serial, func() {
 				})
 				g.Expect(err).NotTo(HaveOccurred())
 				g.Expect(nodeImageSets.Items).To(HaveLen(replicas))
-				g.Expect(nodeImageSets.Items[0].Spec.NodeName).To(Equal("worker-3"))
+
+				zoneSet := make(map[string]struct{})
+				for _, nodeImageSet := range nodeImageSets.Items {
+					nodeName := nodeImageSet.Spec.NodeName
+					node := corev1.Node{}
+					err := k8sClient.Get(ctx, client.ObjectKey{Name: nodeName}, &node)
+					g.Expect(err).NotTo(HaveOccurred())
+					zone := node.Labels["topology.kubernetes.io/zone"]
+					g.Expect(zone).ToNot(BeEmpty())
+					zoneSet[zone] = struct{}{}
+				}
+				g.Expect(zoneSet).To(HaveLen(2)) // 2 failure domains
 			}).Should(Succeed())
 
 			By("cleaning up the ImagePrefetch resource")
@@ -930,29 +926,6 @@ func deleteImagePrefetchResource(ctx context.Context, imagePrefetch *ofenv1.Imag
 		g.Expect(err).To(HaveOccurred())
 		g.Expect(apierrors.IsNotFound(err)).To(BeTrue())
 	}).Should(Succeed())
-}
-
-func updateNodeImage(ctx context.Context, nodeName string, images []string) {
-	node := &corev1.Node{}
-	err := k8sClient.Get(ctx, client.ObjectKey{Name: nodeName}, node)
-	Expect(err).NotTo(HaveOccurred())
-
-	node.Status.Conditions = []corev1.NodeCondition{
-		{
-			Type:   corev1.NodeReady,
-			Status: corev1.ConditionTrue,
-		},
-	}
-	err = k8sClient.Status().Update(ctx, node)
-	Expect(err).NotTo(HaveOccurred())
-
-	for _, image := range images {
-		node.Status.Images = append(node.Status.Images, corev1.ContainerImage{
-			Names: []string{image},
-		})
-	}
-	err = k8sClient.Status().Update(ctx, node)
-	Expect(err).NotTo(HaveOccurred())
 }
 
 func countRegistryPolicy(nodeImageSets *ofenv1.NodeImageSetList) (int, int) {
