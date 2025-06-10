@@ -33,6 +33,7 @@ jobs:
     - uses: actions/setup-go@v5
       with:
         go-version-file: "go.mod"
+    - run: make setup
     - run: make start
       working-directory: test/e2e
     - run: make test
