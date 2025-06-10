@@ -34,6 +34,7 @@ jobs:
       with:
         go-version-file: "go.mod"
     - run: make setup
+      working-directory: test/e2e
     - run: make start
       working-directory: test/e2e
     - run: make test
