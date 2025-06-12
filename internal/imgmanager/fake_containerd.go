@@ -55,8 +55,34 @@ func (f *FakeContainerd) IsImageExists(ctx context.Context, ref string) (bool, e
 	return exists, nil
 }
 
-func (f *FakeContainerd) Subscribe(ctx context.Context, images []string) (<-chan *events.Envelope, <-chan error) {
-	return f.testEventsCh, f.testErrCh
+func (f *FakeContainerd) Subscribe(ctx context.Context) (<-chan *events.Envelope, <-chan error) {
+	eventsCh := make(chan *events.Envelope)
+	errCh := make(chan error)
+
+	go func() {
+		defer close(eventsCh)
+		defer close(errCh)
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case event := <-f.testEventsCh:
+				select {
+				case eventsCh <- event:
+				case <-ctx.Done():
+					return
+				}
+			case err := <-f.testErrCh:
+				select {
+				case errCh <- err:
+				case <-ctx.Done():
+					return
+				}
+			}
+		}
+	}()
+
+	return eventsCh, errCh
 }
 
 func (f *FakeContainerd) SendTestEvent(event *events.Envelope) error {
@@ -105,7 +131,7 @@ func (f *FakeContainerd) RegisterImagePullError(ref string, err error) {
 	f.pullErrorOverrides[ref] = err
 }
 
-func (f *FakeContainerd) PullImage(ctx context.Context, ref string, policy ofenv1.RegistryPolicy) error {
+func (f *FakeContainerd) PullImage(ctx context.Context, ref string, policy ofenv1.RegistryPolicy, secrets *[]corev1.Secret) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
@@ -162,6 +188,22 @@ func (f *FakeContainerd) SetPullDelay(delay time.Duration) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.pullDelay = delay
+}
+
+// SetImageExists allows setting whether an image exists in the fake registry
+func (f *FakeContainerd) SetImageExists(ref string, exists bool) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.pulledImages[ref] = exists
+}
+
+// SendDeleteEvent sends a delete event for testing purposes
+func (f *FakeContainerd) SendDeleteEvent(ref string) error {
+	event, err := CreateImageDeleteEvent(ref)
+	if err != nil {
+		return err
+	}
+	return f.SendTestEvent(event)
 }
 
 func CreateImageDeleteEvent(ref string) (*events.Envelope, error) {

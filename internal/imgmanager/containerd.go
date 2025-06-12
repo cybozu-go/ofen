@@ -4,9 +4,8 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
-	"strings"
-
 	"fmt"
+	"strings"
 
 	"github.com/containerd/containerd/namespaces"
 	containerdclient "github.com/containerd/containerd/v2/client"
@@ -21,6 +20,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
+type ContainerdClient interface {
+	IsImageExists(ctx context.Context, ref string) (bool, error)
+	PullImage(ctx context.Context, ref string, policy ofenv1.RegistryPolicy, secrets *[]corev1.Secret) error
+	Subscribe(ctx context.Context) (<-chan *events.Envelope, <-chan error)
+}
+
 type ContainerdConfig struct {
 	SockAddr  string
 	Namespace string
@@ -30,7 +35,6 @@ type ContainerdConfig struct {
 type Containerd struct {
 	client           *containerdclient.Client
 	containerdConfig *ContainerdConfig
-	tokens           map[string]Credentials
 }
 
 type Credentials struct {
@@ -42,7 +46,6 @@ func NewContainerd(containerdConfig *ContainerdConfig, client *containerdclient.
 	return &Containerd{
 		containerdConfig: containerdConfig,
 		client:           client,
-		tokens:           make(map[string]Credentials),
 	}
 }
 
@@ -57,8 +60,17 @@ func (c *Containerd) IsImageExists(ctx context.Context, ref string) (bool, error
 	return len(images) != 0, nil
 }
 
-func (c *Containerd) PullImage(ctx context.Context, ref string, policy ofenv1.RegistryPolicy) error {
+func (c *Containerd) PullImage(ctx context.Context, ref string, policy ofenv1.RegistryPolicy, secrets *[]corev1.Secret) error {
 	ctx = namespaces.WithNamespace(ctx, c.containerdConfig.Namespace)
+
+	tokens := map[string]Credentials{}
+	if secrets != nil && len(*secrets) > 0 {
+		var err error
+		tokens, err = c.convertCredentials(*secrets)
+		if err != nil {
+			return fmt.Errorf("failed to convert credentials: %w", err)
+		}
+	}
 
 	var useMirrorOnly bool
 	switch policy {
@@ -70,7 +82,7 @@ func (c *Containerd) PullImage(ctx context.Context, ref string, policy ofenv1.Re
 		return fmt.Errorf("unknown registry policy %q", policy)
 	}
 
-	resolver := c.setupResolver(ctx, useMirrorOnly)
+	resolver := c.setupResolver(ctx, useMirrorOnly, tokens)
 	pullOptions := []containerdclient.RemoteOpt{
 		containerdclient.WithPullUnpack,
 		containerdclient.WithResolver(resolver),
@@ -87,11 +99,11 @@ func (c *Containerd) PullImage(ctx context.Context, ref string, policy ofenv1.Re
 	return nil
 }
 
-func (c *Containerd) setupResolver(ctx context.Context, useMirrorOnly bool) remotes.Resolver {
+func (c *Containerd) setupResolver(ctx context.Context, useMirrorOnly bool, tokens map[string]Credentials) remotes.Resolver {
 	ctx = namespaces.WithNamespace(ctx, c.containerdConfig.Namespace)
 	hostOpt := config.HostOptions{
 		HostDir:     config.HostDirFromRoot(c.containerdConfig.HostDir),
-		Credentials: c.credentials(),
+		Credentials: credentials(tokens),
 	}
 	resolveOpt := docker.ResolverOptions{
 		Hosts: config.ConfigureHosts(ctx, hostOpt),
@@ -131,9 +143,9 @@ func registryMirrorHosts(ctx context.Context, hostOpt config.HostOptions) docker
 	}
 }
 
-func (c *Containerd) credentials() func(host string) (string, string, error) {
+func credentials(tokens map[string]Credentials) func(host string) (string, string, error) {
 	return func(host string) (string, string, error) {
-		if h, ok := c.tokens[host]; ok {
+		if h, ok := tokens[host]; ok {
 			return h.Username, h.Password, nil
 		}
 
@@ -147,25 +159,25 @@ type DockerConfig struct {
 	} `json:"auths"`
 }
 
-func (c *Containerd) SetCredentials(ctx context.Context, secrets []corev1.Secret) error {
+func (c *Containerd) convertCredentials(secrets []corev1.Secret) (map[string]Credentials, error) {
 	tokens := map[string]Credentials{}
 	for _, secret := range secrets {
 		var dockerConfig DockerConfig
 
 		data := secret.Data[constants.DockerConfigName]
 		if err := json.Unmarshal(data, &dockerConfig); err != nil {
-			return fmt.Errorf("failed to unmarshal data %w", err)
+			return tokens, fmt.Errorf("failed to unmarshal data %w", err)
 		}
 
 		for registry, auth := range dockerConfig.Auths {
 			data, err := base64.StdEncoding.DecodeString(auth.Auth)
 			if err != nil {
-				return fmt.Errorf("failed to decode auth %s: %w", auth.Auth, err)
+				return tokens, fmt.Errorf("failed to decode auth %s: %w", auth.Auth, err)
 			}
 
 			username, password, ok := strings.Cut(string(data), ":")
 			if !ok {
-				return fmt.Errorf("failed to found username and password in auth %s", auth.Auth)
+				return tokens, fmt.Errorf("failed to found username and password in auth %s", auth.Auth)
 			}
 			tokens[registry] = Credentials{
 				Username: username,
@@ -174,26 +186,16 @@ func (c *Containerd) SetCredentials(ctx context.Context, secrets []corev1.Secret
 		}
 	}
 
-	c.tokens = tokens
-	return nil
+	return tokens, nil
 }
 
-func (c *Containerd) Subscribe(ctx context.Context, images []string) (<-chan *events.Envelope, <-chan error) {
-	filters := generateEventFilter(images)
-	return c.client.EventService().Subscribe(ctx, filters...)
+func (c *Containerd) Subscribe(ctx context.Context) (<-chan *events.Envelope, <-chan error) {
+	filters := generateEventFilter()
+	eventsCh, errCh := c.client.EventService().Subscribe(ctx, filters...)
+	return eventsCh, errCh
 }
 
-func generateEventFilter(images []string) []string {
+func generateEventFilter() []string {
 	baseFilter := `topic~="/images/delete"`
-	if len(images) == 0 {
-		return []string{baseFilter}
-	}
-
-	eventFilters := make([]string, 0, len(images))
-	for _, ref := range images {
-		imageFilter := fmt.Sprintf(`event.name=="%s"`, ref)
-		eventFilters = append(eventFilters, strings.Join([]string{baseFilter, imageFilter}, ","))
-	}
-
-	return eventFilters
+	return []string{baseFilter}
 }

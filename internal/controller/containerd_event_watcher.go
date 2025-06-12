@@ -4,87 +4,89 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/containerd/containerd/v2/core/events"
-	"github.com/containerd/typeurl/v2"
+	ofenv1 "github.com/cybozu-go/ofen/api/v1"
+	"github.com/cybozu-go/ofen/internal/constants"
+	"github.com/cybozu-go/ofen/internal/imgmanager"
 	"github.com/go-logr/logr"
-
-	eventtypes "github.com/containerd/containerd/api/events"
+	"k8s.io/apimachinery/pkg/labels"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 )
 
 type ContainerdEventWatcher struct {
-	containerdClient ContainerdClient
+	k8sClient        client.Client
+	containerdClient imgmanager.ContainerdClient
+	imagePuller      *imgmanager.ImagePuller
 	logger           logr.Logger
-	eventNotifyCh    chan<- string
-	monitoredImages  []string
-	cancel           context.CancelFunc
+	NodeName         string
+	eventNotifyCh    chan<- event.TypedGenericEvent[*ofenv1.NodeImageSet]
 }
 
 func NewContainerdEventWatcher(
-	containerdClient ContainerdClient,
+	k8sClient client.Client,
+	containerdClient imgmanager.ContainerdClient,
+	imagePuller *imgmanager.ImagePuller,
 	logger logr.Logger,
-	eventNotifyCh chan<- string,
-	monitoredImages []string,
+	NodeName string,
+	eventNotifyCh chan<- event.TypedGenericEvent[*ofenv1.NodeImageSet],
 ) *ContainerdEventWatcher {
 	return &ContainerdEventWatcher{
+		k8sClient:        k8sClient,
 		containerdClient: containerdClient,
+		imagePuller:      imagePuller,
 		logger:           logger,
+		NodeName:         NodeName,
 		eventNotifyCh:    eventNotifyCh,
-		monitoredImages:  monitoredImages,
 	}
 }
 
-func (w *ContainerdEventWatcher) Start(ctx context.Context) {
-	w.logger.Info("starting containerd event watcher", "monitoredImages", w.monitoredImages)
-	ctx, cancel := context.WithCancel(ctx)
-	w.cancel = cancel
-	eventsCh, errCh := w.containerdClient.Subscribe(ctx, w.monitoredImages)
+func (w *ContainerdEventWatcher) Start(ctx context.Context) error {
+	w.logger.Info("starting containerd event watcher")
+
+	eventsCh, error := w.imagePuller.SubscribeDeleteEvent(ctx)
+	if error != nil {
+		return fmt.Errorf("failed to subscribe to containerd events: %w", error)
+	}
 
 	for {
-		var e *events.Envelope
 		select {
 		case <-ctx.Done():
 			w.logger.Info("containerd event watcher stopped")
-			return
-		case err := <-errCh:
-			w.logger.Error(err, "error receiving events from containerd")
-			continue
-		case e = <-eventsCh:
-			if e == nil {
-				continue
-			}
-			deleteImageName, err := w.handleEvent(e)
-			if err != nil {
-				w.logger.Error(err, "failed to handle event", "event", e)
-				continue
-			}
+			return nil
+		case deleteImageName := <-eventsCh:
 			if deleteImageName != "" {
-				w.logger.Info("image deletion event received", "image", deleteImageName)
-				w.eventNotifyCh <- deleteImageName
+				w.logger.Info("image deletion event received", "deleteImageName", deleteImageName)
+				w.notifyController(ctx, deleteImageName)
 			}
 		}
 	}
 }
 
-func (w *ContainerdEventWatcher) Stop() {
-	w.logger.Info("stopping containerd event watcher")
-	if w.cancel != nil {
-		w.cancel()
-		w.cancel = nil
-	}
-}
-
-func (w *ContainerdEventWatcher) handleEvent(e *events.Envelope) (string, error) {
-	v, err := typeurl.UnmarshalAny(e.Event)
+func (w *ContainerdEventWatcher) notifyController(ctx context.Context, imageName string) {
+	var nodeImageSetList ofenv1.NodeImageSetList
+	err := w.k8sClient.List(ctx, &nodeImageSetList, &client.ListOptions{
+		LabelSelector: labels.SelectorFromSet(map[string]string{
+			constants.NodeName: w.NodeName,
+		}),
+	})
 	if err != nil {
-		return "", fmt.Errorf("failed to unmarshal event: %w", err)
+		w.logger.Error(err, "failed to list NodeImageSet for node", "nodeName", w.NodeName)
+		return
 	}
 
-	switch event := v.(type) {
-	case *eventtypes.ImageDelete:
-		return event.GetName(), nil
-	default:
-		w.logger.Info("received unsupported event type", "eventType", fmt.Sprintf("%T", event))
+	for _, nis := range nodeImageSetList.Items {
+		for _, image := range nis.Spec.Images {
+			if image == imageName {
+				w.logger.Info("notifying controller to remove image from containerd", "imageName", imageName, "nodeImageSetName", nis.Name)
+				select {
+				case w.eventNotifyCh <- event.TypedGenericEvent[*ofenv1.NodeImageSet]{
+					Object: nis.DeepCopy(),
+				}:
+				case <-ctx.Done():
+					w.logger.Info("context cancelled while notifying controller", "imageName", imageName)
+					return
+				}
+			}
+		}
 	}
-
-	return "", nil
 }

@@ -8,36 +8,36 @@ import (
 	ofenv1 "github.com/cybozu-go/ofen/api/v1"
 	ofenv1apply "github.com/cybozu-go/ofen/internal/applyconfigurations/api/v1"
 	"github.com/cybozu-go/ofen/internal/constants"
+	"github.com/cybozu-go/ofen/internal/imgmanager"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	metav1apply "k8s.io/client-go/applyconfigurations/meta/v1"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/util/workqueue"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/predicate"
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
 // NodeImageSetReconciler reconciles a NodeImageSet object
 type NodeImageSetReconciler struct {
 	client.Client
-	Scheme      *runtime.Scheme
-	NodeName    string
-	ImagePuller *imagePuller
-	Recorder    record.EventRecorder
+	Scheme           *runtime.Scheme
+	NodeName         string
+	ImagePuller      *imgmanager.ImagePuller
+	ContainerdClient imgmanager.ContainerdClient
+	Recorder         record.EventRecorder
+	Queue            workqueue.TypedRateLimitingInterface[Task]
 }
 
 // +kubebuilder:rbac:groups=ofen.cybozu.io,resources=nodeimagesets,verbs=get;list;watch;create;update;patch;delete
@@ -62,7 +62,6 @@ func (r *NodeImageSetReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	if nodeImageSet.DeletionTimestamp != nil {
 		if controllerutil.ContainsFinalizer(&nodeImageSet, constants.NodeImageSetFinalizer) {
 			logger.Info("starting finalization")
-			r.ImagePuller.stop(&nodeImageSet)
 			controllerutil.RemoveFinalizer(&nodeImageSet, constants.NodeImageSetFinalizer)
 			if err := r.Update(ctx, &nodeImageSet); err != nil {
 				return ctrl.Result{}, err
@@ -124,13 +123,47 @@ func (r *NodeImageSetReconciler) reconcileNodeImageSet(ctx context.Context, node
 		secrets = append(secrets, secret)
 	}
 
-	requireImagePullerRefresh := nodeImageSet.Generation != nodeImageSet.Status.ObservedGeneration
-	if err := r.ImagePuller.start(ctx, nodeImageSet, secrets, r.Recorder, requireImagePullerRefresh); err != nil {
-		logger.Error(err, "failed to start image pull process")
-		return err
+	if !r.ImagePuller.IsExistsNodeImageSetStatus(nodeImageSet.Name) {
+		logger.Info("initializing NodeImageSet status", "nodeImageSet", nodeImageSet.Name)
+		r.ImagePuller.NewNodeImageSetStatus(nodeImageSet.Name)
+	}
+
+	pendingImages := r.collectPendingImages(ctx, nodeImageSet)
+	if len(pendingImages) == 0 {
+		logger.Info("no images to process", "nodeImageSet", nodeImageSet.Name)
+		return nil
+	}
+
+	for _, image := range pendingImages {
+		task := Task{
+			Ref:              image,
+			RegistryPolicy:   nodeImageSet.Spec.RegistryPolicy,
+			NodeImageSetName: nodeImageSet.Name,
+			Secrets:          &secrets,
+		}
+		r.Queue.Add(task)
 	}
 
 	return nil
+}
+
+func (r *NodeImageSetReconciler) collectPendingImages(ctx context.Context, nodeImageSet *ofenv1.NodeImageSet) []string {
+	if nodeImageSet.Generation != nodeImageSet.Status.ObservedGeneration {
+		return nodeImageSet.Spec.Images
+	}
+
+	var images []string
+	for _, image := range nodeImageSet.Spec.Images {
+		status, _, err := r.ImagePuller.GetImageStatus(ctx, nodeImageSet.Name, image)
+		if err != nil {
+			log.FromContext(ctx).Error(err, "failed to get image status", "image", image)
+			continue
+		}
+		if status == ofenv1.WaitingForImageDownload || status == ofenv1.ImageDownloadFailed {
+			images = append(images, image)
+		}
+	}
+	return images
 }
 
 func (r *NodeImageSetReconciler) updateStatus(ctx context.Context, nodeImageSet *ofenv1.NodeImageSet) (ctrl.Result, error) {
@@ -138,72 +171,78 @@ func (r *NodeImageSetReconciler) updateStatus(ctx context.Context, nodeImageSet 
 	logger.Info("updating NodeImageSet status", "name", nodeImageSet.Name)
 	result := ctrl.Result{RequeueAfter: 10 * time.Second}
 
-	statuses := r.ImagePuller.GetImageStatuses(nodeImageSet.Name)
-	desired, downloaded, failed := calculateImageStatus(nodeImageSet, statuses)
+	desiredImage := len(nodeImageSet.Spec.Images)
+	downloadedImage, failedImage := r.calculateImageStatus(ctx, nodeImageSet)
 
 	nodeImageSetSSA := ofenv1apply.NodeImageSet(nodeImageSet.Name).
 		WithStatus(
 			ofenv1apply.NodeImageSetStatus().
-				WithDesiredImages(desired).
-				WithAvailableImages(downloaded).
-				WithDownloadFailedImages(failed).
+				WithDesiredImages(desiredImage).
+				WithAvailableImages(downloadedImage).
+				WithDownloadFailedImages(failedImage).
 				WithObservedGeneration(nodeImageSet.Generation),
 		)
 
-	for _, status := range statuses {
+	for _, image := range nodeImageSet.Spec.Images {
+		var errMsg string
+		status, errMsg, err := r.ImagePuller.GetImageStatus(ctx, nodeImageSet.Name, image)
+		if err != nil {
+			return ctrl.Result{}, fmt.Errorf("failed to get image status for %s: %w", image, err)
+		}
+
 		nodeImageSetSSA.Status.WithContainerImageStatuses(
 			ofenv1apply.ContainerImageStatus().
-				WithImageRef(status.ImageRef).
-				WithState(status.State).
-				WithError(status.Error),
+				WithImageRef(image).
+				WithState(status).
+				WithError(errMsg),
 		)
 	}
 
-	if desired == downloaded {
-		logger.Info("all images are downloaded")
+	if desiredImage == downloadedImage {
+		logger.Info("all images are downloadedImage")
 		nodeImageSetSSA.Status.WithConditions(
-			conditionPatch(nodeImageSet.Status.Conditions,
+			mergeCondition(nodeImageSet.Status.Conditions,
 				metav1apply.Condition().
 					WithType(ofenv1.ConditionImageAvailable).
 					WithStatus(metav1.ConditionTrue).
 					WithReason("ImageDownloadComplete").
-					WithMessage("All images are downloaded"),
+					WithMessage("All images are downloadedImage"),
 			),
 		)
 		nodeImageSetSSA.Status.WithConditions(
-			conditionPatch(nodeImageSet.Status.Conditions,
+			mergeCondition(nodeImageSet.Status.Conditions,
 				metav1apply.Condition().
 					WithType(ofenv1.ConditionImageDownloadComplete).
 					WithStatus(metav1.ConditionTrue).
 					WithReason("ImageDownloadComplete").
-					WithMessage("All images are downloaded"),
+					WithMessage("All images are downloadedImage"),
 			),
 		)
 		result = ctrl.Result{}
 	} else {
 		nodeImageSetSSA.Status.WithConditions(
-			conditionPatch(nodeImageSet.Status.Conditions,
+			mergeCondition(nodeImageSet.Status.Conditions,
 				metav1apply.Condition().
 					WithType(ofenv1.ConditionImageAvailable).
 					WithStatus(metav1.ConditionFalse).
 					WithReason("ImageDownloadIncomplete").
-					WithMessage("Waiting for images to be downloaded"),
+					WithMessage("Waiting for images to be downloadedImage"),
 			),
 		)
 		nodeImageSetSSA.Status.WithConditions(
-			conditionPatch(nodeImageSet.Status.Conditions,
+			mergeCondition(nodeImageSet.Status.Conditions,
 				metav1apply.Condition().
 					WithType(ofenv1.ConditionImageDownloadComplete).
 					WithStatus(metav1.ConditionFalse).
 					WithReason("ImageDownloadIncomplete").
-					WithMessage("Waiting for images to be downloaded"),
+					WithMessage("Waiting for images to be downloadedImage"),
 			),
 		)
 	}
 
-	if failed > 0 {
+	if failedImage > 0 {
 		nodeImageSetSSA.Status.WithConditions(
-			conditionPatch(nodeImageSet.Status.Conditions,
+			mergeCondition(nodeImageSet.Status.Conditions,
 				metav1apply.Condition().
 					WithType(ofenv1.ConditionImageDownloadFailed).
 					WithStatus(metav1.ConditionTrue).
@@ -213,7 +252,7 @@ func (r *NodeImageSetReconciler) updateStatus(ctx context.Context, nodeImageSet 
 		)
 	} else {
 		nodeImageSetSSA.Status.WithConditions(
-			conditionPatch(nodeImageSet.Status.Conditions,
+			mergeCondition(nodeImageSet.Status.Conditions,
 				metav1apply.Condition().
 					WithType(ofenv1.ConditionImageDownloadFailed).
 					WithStatus(metav1.ConditionFalse).
@@ -229,28 +268,41 @@ func (r *NodeImageSetReconciler) updateStatus(ctx context.Context, nodeImageSet 
 	return result, nil
 }
 
-func calculateImageStatus(nodeImageSet *ofenv1.NodeImageSet, containerStatuses []ofenv1.ContainerImageStatus) (int, int, int) {
-	desired := len(nodeImageSet.Spec.Images)
-	downloaded := 0
+func (r *NodeImageSetReconciler) calculateImageStatus(ctx context.Context, nis *ofenv1.NodeImageSet) (int, int) {
+	downloadedImage := 0
 	failed := 0
 
-	for _, status := range containerStatuses {
-		if status.State == ofenv1.ImageDownloaded {
-			downloaded++
+	for _, image := range nis.Spec.Images {
+		status, _, err := r.ImagePuller.GetImageStatus(ctx, nis.Name, image)
+		if err != nil {
+			log.FromContext(ctx).Error(err, "failed to get image status", "image", image)
+			continue
 		}
-		if status.Error != "" {
+		switch status {
+		case ofenv1.ImageDownloaded:
+			downloadedImage++
+		case ofenv1.ImageDownloadFailed:
 			failed++
+		case ofenv1.ImageDownloadInProgress:
+		default:
 		}
 	}
-
-	return desired, downloaded, failed
+	return downloadedImage, failed
 }
 
-func conditionPatch(existingConditions []metav1.Condition, condition *metav1apply.ConditionApplyConfiguration) *metav1apply.ConditionApplyConfiguration {
+func mergeCondition(existingConditions []metav1.Condition, condition *metav1apply.ConditionApplyConfiguration) *metav1apply.ConditionApplyConfiguration {
+	if condition == nil {
+		return condition
+	}
+
 	if condition.LastTransitionTime == nil {
-		existingCondition := meta.FindStatusCondition(existingConditions, *condition.Type)
-		if existingCondition != nil && existingCondition.Status == *condition.Status {
-			condition.WithLastTransitionTime(existingCondition.LastTransitionTime)
+		if condition.Type != nil && condition.Status != nil {
+			existingCondition := meta.FindStatusCondition(existingConditions, *condition.Type)
+			if existingCondition != nil && existingCondition.Status == *condition.Status {
+				condition.WithLastTransitionTime(existingCondition.LastTransitionTime)
+			} else {
+				condition.WithLastTransitionTime(metav1.NewTime(time.Now()))
+			}
 		} else {
 			condition.WithLastTransitionTime(metav1.NewTime(time.Now()))
 		}
@@ -279,57 +331,17 @@ func (r *NodeImageSetReconciler) applyNodeImageSetStatus(ctx context.Context, no
 		return fmt.Errorf("failed to extract NodeImageSet status: %w", err)
 	}
 
-	if equality.Semantic.DeepEqual(currentStatusApplyConfig, nodeImageSetSSA) {
+	if equality.Semantic.DeepEqual(currentStatusApplyConfig, nodeImageSetSSA.Status) {
 		return nil
 	}
 
 	return r.Status().Patch(ctx, patch, client.Apply, client.ForceOwnership, client.FieldOwner(constants.NodeImageSetFieldManager))
-
 }
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *NodeImageSetReconciler) SetupWithManager(mgr ctrl.Manager, ch chan event.TypedGenericEvent[*ofenv1.NodeImageSet]) error {
-	nodeHandler := handler.EnqueueRequestsFromMapFunc(
-		func(ctx context.Context, obj client.Object) []reconcile.Request {
-			logger := log.FromContext(ctx)
-			node := obj.(*corev1.Node)
-
-			var nodeImageSetList ofenv1.NodeImageSetList
-			if err := r.List(ctx, &nodeImageSetList, &client.ListOptions{
-				LabelSelector: labels.SelectorFromSet(
-					labels.Set{
-						constants.NodeName: node.Name,
-					},
-				),
-			}); err != nil {
-				logger.Error(err, "failed to list NodeImageSet")
-				return nil
-			}
-
-			var requests []ctrl.Request
-			for _, nis := range nodeImageSetList.Items {
-				requests = append(requests, ctrl.Request{
-					NamespacedName: client.ObjectKeyFromObject(&nis),
-				})
-			}
-			return requests
-		})
-
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&ofenv1.NodeImageSet{}).
 		WatchesRawSource(source.Channel(ch, &handler.TypedEnqueueRequestForObject[*ofenv1.NodeImageSet]{})).
-		Watches(
-			&corev1.Node{},
-			nodeHandler,
-			builder.WithPredicates(nodePredicate()),
-		).
 		Complete(r)
-}
-
-func nodePredicate() predicate.Predicate {
-	return predicate.Funcs{
-		DeleteFunc: func(e event.DeleteEvent) bool {
-			return true
-		},
-	}
 }

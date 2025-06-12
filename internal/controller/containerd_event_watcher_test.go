@@ -10,19 +10,25 @@ import (
 	"github.com/containerd/containerd/v2/core/events"
 	"github.com/containerd/typeurl/v2"
 	ofenv1 "github.com/cybozu-go/ofen/api/v1"
+	"github.com/cybozu-go/ofen/internal/constants"
 	"github.com/cybozu-go/ofen/internal/imgmanager"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
+)
+
+const (
+	imageName = "test-image-deleted:latest"
 )
 
 var _ = Describe("ContainerdEventWatcher", func() {
 	var (
 		fakeContainerdClient *imgmanager.FakeContainerd
-		eventChannel         chan string
+		eventChannel         chan event.TypedGenericEvent[*ofenv1.NodeImageSet]
 		nodeName             string
 		wg                   sync.WaitGroup
 		stopFunc             func()
@@ -36,7 +42,10 @@ var _ = Describe("ContainerdEventWatcher", func() {
 		fakeContainerdClient = imgmanager.NewFakeContainerd(k8sClient)
 		fakeContainerdClient.SetNodeName(nodeName)
 		log := logf.Log.WithName("eventwatcher_test")
-		eventChannel = make(chan string, 5)
+		eventChannel = make(chan event.TypedGenericEvent[*ofenv1.NodeImageSet])
+
+		// Create ImagePuller instance
+		imagePuller := imgmanager.NewImagePuller(log, fakeContainerdClient)
 
 		// Create a test node
 		node := &corev1.Node{
@@ -59,21 +68,26 @@ var _ = Describe("ContainerdEventWatcher", func() {
 		nis := &ofenv1.NodeImageSet{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: nodeName,
+				Labels: map[string]string{
+					constants.NodeName: nodeName,
+				},
 			},
 			Spec: ofenv1.NodeImageSetSpec{
 				NodeName: nodeName,
-				Images:   []string{},
+				Images:   []string{imageName},
 			},
 		}
 		err = k8sClient.Create(ctx, nis)
 		Expect(err).NotTo(HaveOccurred())
 
-		eventWatcher := NewContainerdEventWatcher(fakeContainerdClient, log, eventChannel, []string{})
+		eventWatcher := NewContainerdEventWatcher(k8sClient, fakeContainerdClient, imagePuller, log, nodeName, eventChannel)
 		wg.Add(1)
 		go func() {
 			defer GinkgoRecover()
-			eventWatcher.Start(ctx)
-			wg.Done()
+			defer wg.Done()
+			if err := eventWatcher.Start(ctx); err != nil {
+				log.Error(err, "eventWatcher.Start failed")
+			}
 		}()
 		time.Sleep(200 * time.Millisecond)
 	})
@@ -98,8 +112,6 @@ var _ = Describe("ContainerdEventWatcher", func() {
 
 	Context("when an image delete event occurs for an image on the node", func() {
 		It("should send a GenericEvent to the event channel for the node's NodeImageSet", func() {
-			imageName := "test-image-deleted:latest"
-
 			By("creating and sending an image delete event")
 			imgDeleteEvent := &eventtypes.ImageDelete{Name: imageName}
 			anyEvent, err := typeurl.MarshalAny(imgDeleteEvent)
@@ -114,11 +126,11 @@ var _ = Describe("ContainerdEventWatcher", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			By("checking for the event on the channel")
-			var receivedEvent string
+			var receivedEvent event.TypedGenericEvent[*ofenv1.NodeImageSet]
 			Eventually(eventChannel, "5s", "100ms").Should(Receive(&receivedEvent), "Should receive an event on the channel")
 
-			Expect(receivedEvent).NotTo(BeNil(), "Received event object should not be nil")
-			Expect(receivedEvent).To(Equal(imageName), "Event should be for the NodeImageSet matching the node name")
+			Expect(receivedEvent.Object).NotTo(BeNil(), "Received event object should not be nil")
+			Expect(receivedEvent.Object.Name).To(Equal(nodeName), "Event should be for the NodeImageSet matching the node name")
 		})
 
 		It("should not send an event for non-image-delete topics", func() {

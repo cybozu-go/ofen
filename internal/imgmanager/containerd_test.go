@@ -2,51 +2,158 @@ package imgmanager
 
 import (
 	"context"
+	"encoding/base64"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/containerd/containerd/v2/core/remotes/docker/config"
+	"github.com/cybozu-go/ofen/internal/constants"
 	"github.com/stretchr/testify/require"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestGenerateEventFilter(t *testing.T) {
 	t.Parallel()
 
+	expected := []string{`topic~="/images/delete"`}
+	filter := generateEventFilter()
+	require.Equal(t, expected, filter)
+}
+
+func TestContainerdConvertCredentials(t *testing.T) {
+	t.Parallel()
+
+	config := &ContainerdConfig{
+		Namespace: "test",
+	}
+	c := NewContainerd(config, nil)
+
 	tests := []struct {
-		name     string
-		images   []string
-		expected []string
+		name          string
+		secrets       []corev1.Secret
+		expectedCreds map[string]Credentials
+		expectError   bool
 	}{
 		{
-			name:     "one image",
-			images:   []string{"image1"},
-			expected: []string{"topic~=\"/images/delete\",event.name==\"image1\""},
+			name:          "empty secrets",
+			secrets:       []corev1.Secret{},
+			expectedCreds: map[string]Credentials{},
+			expectError:   false,
 		},
 		{
-			name:   "multiple images",
-			images: []string{"image1", "image2"},
-			expected: []string{
-				"topic~=\"/images/delete\",event.name==\"image1\"",
-				"topic~=\"/images/delete\",event.name==\"image2\"",
+			name: "valid secret",
+			secrets: []corev1.Secret{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "test-secret"},
+					Data: map[string][]byte{
+						constants.DockerConfigName: []byte(`{
+							"auths": {
+								"registry.example.com": {
+									"auth": "` + base64.StdEncoding.EncodeToString([]byte("user:pass")) + `"
+								}
+							}
+						}`),
+					},
+				},
 			},
+			expectedCreds: map[string]Credentials{
+				"registry.example.com": {
+					Username: "user",
+					Password: "pass",
+				},
+			},
+			expectError: false,
 		},
 		{
-			name:   "no image",
-			images: []string{},
-			expected: []string{
-				"topic~=\"/images/delete\"",
+			name: "invalid json",
+			secrets: []corev1.Secret{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "test-secret"},
+					Data: map[string][]byte{
+						constants.DockerConfigName: []byte(`invalid json`),
+					},
+				},
 			},
+			expectedCreds: nil,
+			expectError:   true,
+		},
+		{
+			name: "invalid base64",
+			secrets: []corev1.Secret{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "test-secret"},
+					Data: map[string][]byte{
+						constants.DockerConfigName: []byte(`{
+							"auths": {
+								"registry.example.com": {
+									"auth": "invalid-base64!"
+								}
+							}
+						}`),
+					},
+				},
+			},
+			expectedCreds: nil,
+			expectError:   true,
+		},
+		{
+			name: "invalid auth format",
+			secrets: []corev1.Secret{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "test-secret"},
+					Data: map[string][]byte{
+						constants.DockerConfigName: []byte(`{
+							"auths": {
+								"registry.example.com": {
+									"auth": "` + base64.StdEncoding.EncodeToString([]byte("nocolon")) + `"
+								}
+							}
+						}`),
+					},
+				},
+			},
+			expectedCreds: nil,
+			expectError:   true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			filter := generateEventFilter(tt.images)
-			require.Equal(t, tt.expected, filter)
+			creds, err := c.convertCredentials(tt.secrets)
+			if tt.expectError {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+				require.Equal(t, tt.expectedCreds, creds)
+			}
 		})
 	}
+}
+
+func TestCredentials(t *testing.T) {
+	t.Parallel()
+
+	tokens := map[string]Credentials{
+		"registry.example.com": {
+			Username: "user",
+			Password: "pass",
+		},
+	}
+
+	credFunc := credentials(tokens)
+
+	user, pass, err := credFunc("registry.example.com")
+	require.NoError(t, err)
+	require.Equal(t, "user", user)
+	require.Equal(t, "pass", pass)
+
+	user, pass, err = credFunc("unknown.registry.com")
+	require.NoError(t, err)
+	require.Equal(t, "", user)
+	require.Equal(t, "", pass)
 }
 
 func TestRegistryMirrorHosts(t *testing.T) {
@@ -187,4 +294,44 @@ func createRegistryMirrorHostsFile(registryName string, registryConfig string) (
 	}
 
 	return tmpDir, nil
+}
+
+func TestNewContainerd(t *testing.T) {
+	t.Parallel()
+
+	config := &ContainerdConfig{
+		SockAddr:  "/run/containerd/containerd.sock",
+		Namespace: "test-namespace",
+		HostDir:   "/etc/containerd/certs.d",
+	}
+
+	c := NewContainerd(config, nil)
+
+	require.NotNil(t, c)
+	require.Equal(t, config, c.containerdConfig)
+	require.Nil(t, c.client)
+}
+
+func TestSetupResolver(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	config := &ContainerdConfig{
+		Namespace: "test",
+		HostDir:   "/tmp",
+	}
+	c := NewContainerd(config, nil)
+
+	tokens := map[string]Credentials{
+		"registry.example.com": {
+			Username: "user",
+			Password: "pass",
+		},
+	}
+
+	resolver := c.setupResolver(ctx, false, tokens)
+	require.NotNil(t, resolver)
+
+	resolverMirrorOnly := c.setupResolver(ctx, true, tokens)
+	require.NotNil(t, resolverMirrorOnly)
 }

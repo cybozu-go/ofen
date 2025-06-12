@@ -1,7 +1,7 @@
 include ../../Makefile.common
 E2ETEST_K8S_VERSION  := 1.31.6
 CERT_MANAGER_VERSION := 1.15.0
-SPEGEL_VERSION := 0.0.28
+SPEGEL_VERSION := 0.3.0
 KIND_VERSION := 0.27.0
 
 PROJECT_DIR := $(CURDIR)/../../
@@ -40,8 +40,8 @@ start:
 	$(KUBECTL) -n cert-manager wait --for=condition=available --timeout=180s --all deployments
 	$(KUBECTL) apply -k ../../config/default
 	$(KUBECTL) -n ofen-system wait --for=condition=available --timeout=180s --all deployments
-	helm upgrade --create-namespace --namespace spegel --install --version v$(SPEGEL_VERSION) \
-		spegel oci://ghcr.io/spegel-org/helm-charts/spegel --wait
+	helm upgrade --create-namespace --namespace spegel --install spegel --set image.tag=$(SPEGEL_VERSION) \
+		oci://ghcr.io/spegel-org/helm-charts/spegel --wait
 
 .PHONY: kind-load
 kind-load:

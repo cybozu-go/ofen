@@ -13,6 +13,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/util/workqueue"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
@@ -117,16 +118,49 @@ func main() {
 	}()
 
 	containerdClient := imgmanager.NewContainerd(&containerdConfig, client)
-	log := ctrl.Log.WithName("image-puller").WithValues("nodeName", nodeName)
+	imagePuller := imgmanager.NewImagePuller(ctrl.Log.WithName("imagePuller"), containerdClient)
 	ch := make(chan event.TypedGenericEvent[*ofenv1.NodeImageSet])
-	imagePuller := controller.NewImagePuller(log, containerdClient, mgr.GetClient(), ch)
+	rateLimiter := workqueue.DefaultTypedControllerRateLimiter[controller.Task]()
+	queue := workqueue.NewTypedRateLimitingQueue(rateLimiter)
+
+	runner := controller.NewRunner(
+		mgr.GetClient(),
+		containerdClient,
+		imagePuller,
+		ctrl.Log.WithName("runner").WithValues("nodeName", nodeName),
+		ch,
+		queue,
+		mgr.GetEventRecorderFor("image-pull-runner"),
+	)
+	err = mgr.Add(runner)
+	if err != nil {
+		setupLog.Error(err, "unable to add runner")
+		os.Exit(1)
+	}
+
+	// Set up the containerd event watcher
+	containerdEventWatcher := controller.NewContainerdEventWatcher(
+		mgr.GetClient(),
+		containerdClient,
+		imagePuller,
+		ctrl.Log.WithName("containerd-event-watcher"),
+		nodeName,
+		ch,
+	)
+	err = mgr.Add(containerdEventWatcher)
+	if err != nil {
+		setupLog.Error(err, "unable to add containerd event watcher")
+		os.Exit(1)
+	}
 
 	if err = (&controller.NodeImageSetReconciler{
-		Client:      mgr.GetClient(),
-		Scheme:      mgr.GetScheme(),
-		NodeName:    nodeName,
-		Recorder:    mgr.GetEventRecorderFor("nodeimageset-controller"),
-		ImagePuller: imagePuller,
+		Client:           mgr.GetClient(),
+		Scheme:           mgr.GetScheme(),
+		NodeName:         nodeName,
+		Recorder:         mgr.GetEventRecorderFor("nodeimageset-controller"),
+		ContainerdClient: containerdClient,
+		ImagePuller:      imagePuller,
+		Queue:            queue,
 	}).SetupWithManager(mgr, ch); err != nil {
 		setupLog.Error(err, "unable to start controller", "controller", "nodeimageset")
 		os.Exit(1)

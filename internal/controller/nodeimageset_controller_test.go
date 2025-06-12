@@ -16,6 +16,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/util/workqueue"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -93,21 +94,28 @@ var _ = Describe("NodeImageSet Controller", Serial, func() {
 				},
 			})
 			Expect(err).NotTo(HaveOccurred())
-
 			fakeContainerdClient = imgmanager.NewFakeContainerd(mgr.GetClient())
 			fakeContainerdClient.SetNodeName(nodeName)
-			log := ctrl.Log.WithName("controllers").WithName("NodeImageSet")
 			ch := make(chan event.TypedGenericEvent[*ofenv1.NodeImageSet])
-			imagePuller := NewImagePuller(log, fakeContainerdClient, mgr.GetClient(), ch)
+
+			imagePuller := imgmanager.NewImagePuller(ctrl.Log.WithName("test-imagepuller"), fakeContainerdClient)
+			queue := workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[Task]())
 
 			reconciler := &NodeImageSetReconciler{
-				Client:      mgr.GetClient(),
-				Scheme:      scheme.Scheme,
-				NodeName:    nodeName,
-				ImagePuller: imagePuller,
-				Recorder:    mgr.GetEventRecorderFor("nodeimageset-controller"),
+				Client:           mgr.GetClient(),
+				Scheme:           scheme.Scheme,
+				NodeName:         nodeName,
+				ImagePuller:      imagePuller,
+				ContainerdClient: fakeContainerdClient,
+				Recorder:         mgr.GetEventRecorderFor("nodeimageset-controller"),
+				Queue:            queue,
 			}
 			err = reconciler.SetupWithManager(mgr, ch)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Create and start runner
+			runner := NewRunner(mgr.GetClient(), fakeContainerdClient, imagePuller, ctrl.Log.WithName("test-runner"), ch, queue, mgr.GetEventRecorderFor("test-runner"))
+			err = mgr.Add(runner)
 			Expect(err).NotTo(HaveOccurred())
 
 			ctx, cancel := context.WithCancel(ctx)
