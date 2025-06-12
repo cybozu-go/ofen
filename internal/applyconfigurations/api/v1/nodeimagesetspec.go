@@ -10,11 +10,10 @@ import (
 // NodeImageSetSpecApplyConfiguration represents a declarative configuration of the NodeImageSetSpec type for use
 // with apply.
 type NodeImageSetSpecApplyConfiguration struct {
-	Images                  []string                      `json:"images,omitempty"`
-	RegistryPolicy          *v1.RegistryPolicy            `json:"registryPolicy,omitempty"`
-	NodeName                *string                       `json:"nodeName,omitempty"`
-	ImagePullSecrets        []corev1.LocalObjectReference `json:"imagePullSecrets,omitempty"`
-	ImageDownloadRetryLimit *int32                        `json:"imageDownloadRetryLimit,omitempty"`
+	Images           []string                      `json:"images,omitempty"`
+	RegistryPolicy   *v1.RegistryPolicy            `json:"registryPolicy,omitempty"`
+	NodeName         *string                       `json:"nodeName,omitempty"`
+	ImagePullSecrets []corev1.LocalObjectReference `json:"imagePullSecrets,omitempty"`
 }
 
 // NodeImageSetSpecApplyConfiguration constructs a declarative configuration of the NodeImageSetSpec type for use with
@@ -56,13 +55,5 @@ func (b *NodeImageSetSpecApplyConfiguration) WithImagePullSecrets(values ...core
 	for i := range values {
 		b.ImagePullSecrets = append(b.ImagePullSecrets, values[i])
 	}
-	return b
-}
-
-// WithImageDownloadRetryLimit sets the ImageDownloadRetryLimit field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the ImageDownloadRetryLimit field is set to the value of the last call.
-func (b *NodeImageSetSpecApplyConfiguration) WithImageDownloadRetryLimit(value int32) *NodeImageSetSpecApplyConfiguration {
-	b.ImageDownloadRetryLimit = &value
 	return b
 }

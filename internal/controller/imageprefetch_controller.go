@@ -362,7 +362,7 @@ func getNodeImageSetName(imgPrefetch *ofenv1.ImagePrefetch, nodeName string) (st
 		return "", fmt.Errorf("failed to write string to sha1: %w", err)
 	}
 	hash := hex.EncodeToString(hasher.Sum(nil))
-	return fmt.Sprintf("%s-%s-%s", constants.NodeImageSetPrefix, name, hash[:8]), nil
+	return fmt.Sprintf("%s-%s-%s", constants.NodeImageSetNamePrefix, name, hash[:8]), nil
 }
 
 func (r *ImagePrefetchReconciler) updateStatus(ctx context.Context, imgPrefetch *ofenv1.ImagePrefetch, selectedNodes []string) (ctrl.Result, error) {

@@ -16,6 +16,8 @@ import (
 func ForKind(kind schema.GroupVersionKind) interface{} {
 	switch kind {
 	// Group=ofen.cybozu.io, Version=v1
+	case v1.SchemeGroupVersion.WithKind("ContainerImageStatus"):
+		return &apiv1.ContainerImageStatusApplyConfiguration{}
 	case v1.SchemeGroupVersion.WithKind("ImagePrefetch"):
 		return &apiv1.ImagePrefetchApplyConfiguration{}
 	case v1.SchemeGroupVersion.WithKind("ImagePrefetchSpec"):
