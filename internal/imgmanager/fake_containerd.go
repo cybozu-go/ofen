@@ -15,7 +15,7 @@ import (
 	applycorev1 "k8s.io/client-go/applyconfigurations/core/v1"
 	ctrl "sigs.k8s.io/controller-runtime/pkg/client"
 
-	ofenv1 "github.com/cybozu-go/ofen/api/v1" // Added import
+	ofenv1 "github.com/cybozu-go/ofen/api/v1"
 )
 
 type FakeContainerd struct {
