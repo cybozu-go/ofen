@@ -118,6 +118,10 @@ var _ = Describe("NodeImageSet Controller", Serial, func() {
 			err = mgr.Add(runner)
 			Expect(err).NotTo(HaveOccurred())
 
+			eventWatcher := NewContainerdEventWatcher(mgr.GetClient(), fakeContainerdClient, imagePuller, ctrl.Log.WithName("test-event-watcher"), nodeName, ch)
+			err = mgr.Add(eventWatcher)
+			Expect(err).NotTo(HaveOccurred())
+
 			ctx, cancel := context.WithCancel(ctx)
 			stopFunc = cancel
 			go func() {
