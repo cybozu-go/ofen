@@ -82,23 +82,6 @@ func (r *NodeImageSetReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{Requeue: true}, nil
 	}
 
-	node := &corev1.Node{}
-	if err := r.Get(ctx, client.ObjectKey{Name: r.NodeName}, node); err != nil {
-		if !apierrors.IsNotFound(err) {
-			return ctrl.Result{}, err
-		}
-
-		node = nil
-	}
-
-	if node == nil || node.DeletionTimestamp != nil {
-		logger.Info("node is not found or being deleted", "node", r.NodeName)
-		if err := r.Delete(ctx, &nodeImageSet); err != nil {
-			return ctrl.Result{}, err
-		}
-		return ctrl.Result{}, nil
-	}
-
 	if err := r.reconcileNodeImageSet(ctx, &nodeImageSet); err != nil {
 		return ctrl.Result{}, err
 	}

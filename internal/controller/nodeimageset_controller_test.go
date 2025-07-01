@@ -194,45 +194,6 @@ var _ = Describe("NodeImageSet Controller", Serial, func() {
 			deleteNodeImageSet(ctx, testName)
 		})
 
-		It("should delete the NodeImageSet resource when its associated Node is deleted", func() {
-			testName := "should-delete-nodeimageset"
-			image := fmt.Sprintf("test/%s/image:latest", testName)
-
-			By("creating a NodeImageSet resource")
-			nodeImageSet := createNodeImageSet(testName).
-				WithLabels(map[string]string{
-					constants.NodeName: nodeName,
-				}).
-				withNodeName(nodeName).
-				withImages([]string{image}).
-				withRegistryPolicy(ofenv1.RegistryPolicyDefault).
-				build()
-			err := k8sClient.Create(ctx, nodeImageSet)
-			Expect(err).NotTo(HaveOccurred())
-
-			Eventually(func(g Gomega) {
-				nodeImageSet := &ofenv1.NodeImageSet{}
-				err := k8sClient.Get(ctx, client.ObjectKey{Name: testName}, nodeImageSet)
-				g.Expect(err).NotTo(HaveOccurred())
-				g.Expect(nodeImageSet.Status.DesiredImages).To(Equal(1))
-				g.Expect(nodeImageSet.Status.AvailableImages).To(Equal(1))
-			}).Should(Succeed())
-
-			By("deleting the Node")
-			node := &corev1.Node{}
-			err = k8sClient.Get(ctx, client.ObjectKey{Name: nodeName}, node)
-			Expect(err).NotTo(HaveOccurred())
-			err = k8sClient.Delete(ctx, node)
-			Expect(err).NotTo(HaveOccurred())
-
-			By("checking the NodeImageSet resource is deleted")
-			Eventually(func(g Gomega) {
-				nodeImageSet := &ofenv1.NodeImageSet{}
-				err := k8sClient.Get(ctx, client.ObjectKey{Name: testName}, nodeImageSet)
-				g.Expect(err).To(HaveOccurred())
-			}).Should(Succeed())
-		})
-
 		It("should reconcile the NodeImageSet when the image is deleted", func() {
 			testName := "reconcile-on-image-deletion"
 			image1 := fmt.Sprintf("test/%s/image1:latest", testName)
