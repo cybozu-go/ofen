@@ -188,11 +188,6 @@ var _ = Describe("NodeImageSet Controller", Serial, func() {
 				g.Expect(err).NotTo(HaveOccurred())
 				g.Expect(nodeImageSet.Status.DesiredImages).To(Equal(1))
 				g.Expect(nodeImageSet.Status.AvailableImages).To(Equal(1))
-
-				node := &corev1.Node{}
-				err = k8sClient.Get(ctx, client.ObjectKey{Name: nodeName}, node)
-				g.Expect(err).NotTo(HaveOccurred())
-				g.Expect(node.Status.Images).To(HaveLen(1))
 			}).Should(Succeed())
 
 			By("cleaning up the NodeImageSet resource")
@@ -224,11 +219,6 @@ var _ = Describe("NodeImageSet Controller", Serial, func() {
 				g.Expect(err).NotTo(HaveOccurred())
 				g.Expect(currentNis.Status.DesiredImages).To(Equal(2))
 				g.Expect(currentNis.Status.AvailableImages).To(Equal(2))
-
-				node := &corev1.Node{}
-				err = k8sClient.Get(ctx, client.ObjectKey{Name: nodeName}, node)
-				g.Expect(err).NotTo(HaveOccurred())
-				g.Expect(node.Status.Images).To(HaveLen(2))
 			}).Should(Succeed())
 
 			By("deleting one of the images from the NodeImageSet")

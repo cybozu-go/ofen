@@ -10,9 +10,6 @@ import (
 	"github.com/containerd/containerd/v2/core/events"
 	"github.com/containerd/typeurl/v2"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime"
-	applycorev1 "k8s.io/client-go/applyconfigurations/core/v1"
 	ctrl "sigs.k8s.io/controller-runtime/pkg/client"
 
 	ofenv1 "github.com/cybozu-go/ofen/api/v1"
@@ -147,42 +144,7 @@ func (f *FakeContainerd) PullImage(ctx context.Context, ref string, policy ofenv
 	}
 	f.pulledImages[ref] = true
 
-	currentNode := &corev1.Node{}
-	if err := f.k8sClient.Get(ctx, ctrl.ObjectKey{Name: f.NodeName}, currentNode); err != nil {
-		return err
-	}
-
-	var updatedImageApplyConfigs []*applycorev1.ContainerImageApplyConfiguration
-	if currentNode.Status.Images != nil {
-		for _, img := range currentNode.Status.Images {
-			imgApplyConfig := applycorev1.ContainerImage().
-				WithNames(img.Names...).
-				WithSizeBytes(img.SizeBytes)
-			updatedImageApplyConfigs = append(updatedImageApplyConfigs, imgApplyConfig)
-		}
-	}
-
-	newImageApplyConfig := applycorev1.ContainerImage().
-		WithNames(ref).
-		WithSizeBytes(100)
-	updatedImageApplyConfigs = append(updatedImageApplyConfigs, newImageApplyConfig)
-	desiredNodeApplyConfig := applycorev1.Node(f.NodeName).
-		WithStatus(applycorev1.NodeStatus().
-			WithImages(updatedImageApplyConfigs...))
-
-	fieldManager := "fake-containerd"
-	obj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(desiredNodeApplyConfig)
-	if err != nil {
-		return err
-	}
-	patch := &unstructured.Unstructured{
-		Object: obj,
-	}
-
-	return f.k8sClient.Status().Patch(ctx, patch, ctrl.Apply, ctrl.ForceOwnership,
-		ctrl.FieldOwner(
-			fieldManager,
-		))
+	return nil
 }
 
 func (f *FakeContainerd) SetPullDelay(delay time.Duration) {
