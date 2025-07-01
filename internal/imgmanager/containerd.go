@@ -101,7 +101,6 @@ func (c *Containerd) PullImage(ctx context.Context, ref string, policy ofenv1.Re
 }
 
 func (c *Containerd) setupResolver(ctx context.Context, useMirrorOnly bool, tokens map[string]Credentials) remotes.Resolver {
-	ctx = namespaces.WithNamespace(ctx, c.containerdConfig.Namespace)
 	hostOpt := config.HostOptions{
 		HostDir:     config.HostDirFromRoot(c.containerdConfig.HostDir),
 		Credentials: credentials(tokens),
