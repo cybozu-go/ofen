@@ -3,8 +3,9 @@
 package v1
 
 import (
-	v1 "github.com/cybozu-go/ofen/api/v1"
 	corev1 "k8s.io/api/core/v1"
+
+	v1 "github.com/cybozu-go/ofen/api/v1"
 )
 
 // NodeImageSetSpecApplyConfiguration represents a declarative configuration of the NodeImageSetSpec type for use

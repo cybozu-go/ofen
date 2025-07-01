@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	ofenv1 "github.com/cybozu-go/ofen/api/v1"
-	"github.com/cybozu-go/ofen/internal/constants"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
@@ -20,6 +18,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/config"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
+
+	ofenv1 "github.com/cybozu-go/ofen/api/v1"
+	"github.com/cybozu-go/ofen/internal/constants"
 )
 
 const (

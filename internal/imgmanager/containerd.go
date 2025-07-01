@@ -14,10 +14,11 @@ import (
 	"github.com/containerd/containerd/v2/core/remotes"
 	"github.com/containerd/containerd/v2/core/remotes/docker"
 	"github.com/containerd/containerd/v2/core/remotes/docker/config"
-	ofenv1 "github.com/cybozu-go/ofen/api/v1"
-	"github.com/cybozu-go/ofen/internal/constants"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+
+	ofenv1 "github.com/cybozu-go/ofen/api/v1"
+	"github.com/cybozu-go/ofen/internal/constants"
 )
 
 type ContainerdClient interface {

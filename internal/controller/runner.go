@@ -3,8 +3,6 @@ package controller
 import (
 	"context"
 
-	ofenv1 "github.com/cybozu-go/ofen/api/v1"
-	"github.com/cybozu-go/ofen/internal/imgmanager"
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -12,6 +10,9 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
+
+	ofenv1 "github.com/cybozu-go/ofen/api/v1"
+	"github.com/cybozu-go/ofen/internal/imgmanager"
 )
 
 type Runner struct {

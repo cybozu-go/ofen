@@ -6,9 +6,6 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/errdefs"
-	ofenv1 "github.com/cybozu-go/ofen/api/v1"
-	"github.com/cybozu-go/ofen/internal/constants"
-	"github.com/cybozu-go/ofen/internal/imgmanager"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
@@ -23,6 +20,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/config"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
+
+	ofenv1 "github.com/cybozu-go/ofen/api/v1"
+	"github.com/cybozu-go/ofen/internal/constants"
+	"github.com/cybozu-go/ofen/internal/imgmanager"
 )
 
 type nodeImageSetBuilder struct {

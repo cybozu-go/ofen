@@ -5,10 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	ofenv1 "github.com/cybozu-go/ofen/api/v1"
-	ofenv1apply "github.com/cybozu-go/ofen/internal/applyconfigurations/api/v1"
-	"github.com/cybozu-go/ofen/internal/constants"
-	"github.com/cybozu-go/ofen/internal/imgmanager"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -27,6 +23,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+
+	ofenv1 "github.com/cybozu-go/ofen/api/v1"
+	ofenv1apply "github.com/cybozu-go/ofen/internal/applyconfigurations/api/v1"
+	"github.com/cybozu-go/ofen/internal/constants"
+	"github.com/cybozu-go/ofen/internal/imgmanager"
 )
 
 // NodeImageSetReconciler reconciles a NodeImageSet object

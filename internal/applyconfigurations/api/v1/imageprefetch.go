@@ -3,12 +3,13 @@
 package v1
 
 import (
-	ofenapiv1 "github.com/cybozu-go/ofen/api/v1"
-	internal "github.com/cybozu-go/ofen/internal/applyconfigurations/internal"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
+
+	ofenapiv1 "github.com/cybozu-go/ofen/api/v1"
+	internal "github.com/cybozu-go/ofen/internal/applyconfigurations/internal"
 )
 
 // ImagePrefetchApplyConfiguration represents a declarative configuration of the ImagePrefetch type for use

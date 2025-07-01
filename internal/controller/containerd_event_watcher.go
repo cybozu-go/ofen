@@ -4,13 +4,14 @@ import (
 	"context"
 	"fmt"
 
-	ofenv1 "github.com/cybozu-go/ofen/api/v1"
-	"github.com/cybozu-go/ofen/internal/constants"
-	"github.com/cybozu-go/ofen/internal/imgmanager"
 	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/labels"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
+
+	ofenv1 "github.com/cybozu-go/ofen/api/v1"
+	"github.com/cybozu-go/ofen/internal/constants"
+	"github.com/cybozu-go/ofen/internal/imgmanager"
 )
 
 type ContainerdEventWatcher struct {

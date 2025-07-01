@@ -8,10 +8,11 @@ import (
 	"testing"
 
 	"github.com/containerd/containerd/v2/core/remotes/docker/config"
-	"github.com/cybozu-go/ofen/internal/constants"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/cybozu-go/ofen/internal/constants"
 )
 
 func TestGenerateEventFilter(t *testing.T) {

@@ -9,12 +9,13 @@ import (
 	eventtypes "github.com/containerd/containerd/api/events"
 	"github.com/containerd/containerd/v2/core/events"
 	"github.com/containerd/typeurl/v2"
-	ofenv1 "github.com/cybozu-go/ofen/api/v1" // Added import
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	applycorev1 "k8s.io/client-go/applyconfigurations/core/v1"
 	ctrl "sigs.k8s.io/controller-runtime/pkg/client"
+
+	ofenv1 "github.com/cybozu-go/ofen/api/v1" // Added import
 )
 
 type FakeContainerd struct {

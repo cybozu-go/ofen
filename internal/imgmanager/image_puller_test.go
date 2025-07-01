@@ -10,10 +10,11 @@ import (
 	eventtypes "github.com/containerd/containerd/api/events"
 	"github.com/containerd/containerd/v2/core/events"
 	"github.com/containerd/typeurl/v2"
-	ofenv1 "github.com/cybozu-go/ofen/api/v1"
 	"github.com/go-logr/logr"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	ofenv1 "github.com/cybozu-go/ofen/api/v1"
 )
 
 func TestImagePullStatusConcurrentAccess(t *testing.T) {

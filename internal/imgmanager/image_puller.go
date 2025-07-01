@@ -9,9 +9,10 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/v2/core/events"
 	"github.com/containerd/typeurl/v2"
-	ofenv1 "github.com/cybozu-go/ofen/api/v1"
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
+
+	ofenv1 "github.com/cybozu-go/ofen/api/v1"
 )
 
 type NodeImageSetStatus struct {

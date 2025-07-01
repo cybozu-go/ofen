@@ -10,12 +10,15 @@ import (
 	"sort"
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	metav1apply "k8s.io/client-go/applyconfigurations/meta/v1"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
@@ -30,9 +33,6 @@ import (
 	ofenv1apply "github.com/cybozu-go/ofen/internal/applyconfigurations/api/v1"
 	"github.com/cybozu-go/ofen/internal/constants"
 	"github.com/cybozu-go/ofen/internal/util"
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	metav1apply "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
 // ImagePrefetchReconciler reconciles a ImagePrefetch object
