@@ -96,7 +96,6 @@ var _ = Describe("NodeImageSet Controller", Serial, func() {
 			})
 			Expect(err).NotTo(HaveOccurred())
 			fakeContainerdClient = imgmanager.NewFakeContainerd(mgr.GetClient())
-			fakeContainerdClient.SetNodeName(nodeName)
 			ch := make(chan event.TypedGenericEvent[*ofenv1.NodeImageSet])
 
 			imagePuller := imgmanager.NewImagePuller(ctrl.Log.WithName("test-imagepuller"), fakeContainerdClient)

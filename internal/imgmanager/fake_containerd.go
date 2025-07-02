@@ -20,7 +20,6 @@ type FakeContainerd struct {
 	pulledImages       map[string]bool
 	pullErrorOverrides map[string]error
 	k8sClient          ctrl.Client
-	NodeName           string
 	pullDelay          time.Duration // Simulate delay for pulling images
 	testEventsCh       chan *events.Envelope
 	testErrCh          chan error
@@ -34,10 +33,6 @@ func NewFakeContainerd(k8sClient ctrl.Client) *FakeContainerd {
 		testEventsCh:       make(chan *events.Envelope, 10),
 		testErrCh:          make(chan error, 10),
 	}
-}
-
-func (f *FakeContainerd) SetNodeName(name string) {
-	f.NodeName = name
 }
 
 func (f *FakeContainerd) IsImageExists(ctx context.Context, ref string) (bool, error) {

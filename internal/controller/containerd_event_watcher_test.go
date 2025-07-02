@@ -41,7 +41,6 @@ var _ = Describe("ContainerdEventWatcher", func() {
 		stopFunc = cancel
 		nodeName = fmt.Sprintf("event-watcher-test-node-%d", time.Now().UnixNano())
 		fakeContainerdClient = imgmanager.NewFakeContainerd(k8sClient)
-		fakeContainerdClient.SetNodeName(nodeName)
 		log := logf.Log.WithName("eventwatcher_test")
 		eventChannel = make(chan event.TypedGenericEvent[*ofenv1.NodeImageSet])
 
