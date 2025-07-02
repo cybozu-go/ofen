@@ -2,10 +2,7 @@ package imgmanager
 
 import (
 	"context"
-	"encoding/base64"
-	"encoding/json"
 	"fmt"
-	"strings"
 
 	"github.com/containerd/containerd/namespaces"
 	containerdclient "github.com/containerd/containerd/v2/client"
@@ -18,7 +15,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	ofenv1 "github.com/cybozu-go/ofen/api/v1"
-	"github.com/cybozu-go/ofen/internal/constants"
 )
 
 type ContainerdClient interface {
@@ -36,11 +32,6 @@ type ContainerdConfig struct {
 type Containerd struct {
 	client           *containerdclient.Client
 	containerdConfig *ContainerdConfig
-}
-
-type Credentials struct {
-	Username string
-	Password string
 }
 
 func NewContainerd(containerdConfig *ContainerdConfig, client *containerdclient.Client) *Containerd {
@@ -67,7 +58,7 @@ func (c *Containerd) PullImage(ctx context.Context, ref string, policy ofenv1.Re
 	tokens := map[string]Credentials{}
 	if secrets != nil && len(*secrets) > 0 {
 		var err error
-		tokens, err = c.convertCredentials(*secrets)
+		tokens, err = convertCredentials(*secrets)
 		if err != nil {
 			return fmt.Errorf("failed to convert credentials: %w", err)
 		}
@@ -151,42 +142,6 @@ func credentials(tokens map[string]Credentials) func(host string) (string, strin
 
 		return "", "", nil
 	}
-}
-
-type DockerConfig struct {
-	Auths map[string]struct {
-		Auth string `json:"auth"`
-	} `json:"auths"`
-}
-
-func (c *Containerd) convertCredentials(secrets []corev1.Secret) (map[string]Credentials, error) {
-	tokens := map[string]Credentials{}
-	for _, secret := range secrets {
-		var dockerConfig DockerConfig
-
-		data := secret.Data[constants.DockerConfigName]
-		if err := json.Unmarshal(data, &dockerConfig); err != nil {
-			return tokens, fmt.Errorf("failed to unmarshal data %w", err)
-		}
-
-		for registry, auth := range dockerConfig.Auths {
-			data, err := base64.StdEncoding.DecodeString(auth.Auth)
-			if err != nil {
-				return tokens, fmt.Errorf("failed to decode auth %s: %w", auth.Auth, err)
-			}
-
-			username, password, ok := strings.Cut(string(data), ":")
-			if !ok {
-				return tokens, fmt.Errorf("failed to found username and password in auth %s", auth.Auth)
-			}
-			tokens[registry] = Credentials{
-				Username: username,
-				Password: password,
-			}
-		}
-	}
-
-	return tokens, nil
 }
 
 func (c *Containerd) Subscribe(ctx context.Context) (<-chan *events.Envelope, <-chan error) {

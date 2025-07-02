@@ -18,4 +18,7 @@ const (
 	NodeImageSetFieldManager = NodeImageSetPrefix + "nodeimageset-controller"
 )
 
-const DockerConfigName = ".dockerconfigjson"
+const (
+	DockerConfigName = ".dockerconfigjson"
+	DockerCfgName    = ".dockercfg"
+)

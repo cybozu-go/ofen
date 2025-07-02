@@ -2,17 +2,12 @@ package imgmanager
 
 import (
 	"context"
-	"encoding/base64"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/containerd/containerd/v2/core/remotes/docker/config"
 	"github.com/stretchr/testify/require"
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	"github.com/cybozu-go/ofen/internal/constants"
 )
 
 func TestGenerateEventFilter(t *testing.T) {
@@ -21,117 +16,6 @@ func TestGenerateEventFilter(t *testing.T) {
 	expected := []string{`topic~="/images/delete"`}
 	filter := generateEventFilter()
 	require.Equal(t, expected, filter)
-}
-
-func TestContainerdConvertCredentials(t *testing.T) {
-	t.Parallel()
-
-	config := &ContainerdConfig{
-		Namespace: "test",
-	}
-	c := NewContainerd(config, nil)
-
-	tests := []struct {
-		name          string
-		secrets       []corev1.Secret
-		expectedCreds map[string]Credentials
-		expectError   bool
-	}{
-		{
-			name:          "empty secrets",
-			secrets:       []corev1.Secret{},
-			expectedCreds: map[string]Credentials{},
-			expectError:   false,
-		},
-		{
-			name: "valid secret",
-			secrets: []corev1.Secret{
-				{
-					ObjectMeta: metav1.ObjectMeta{Name: "test-secret"},
-					Data: map[string][]byte{
-						constants.DockerConfigName: []byte(`{
-							"auths": {
-								"registry.example.com": {
-									"auth": "` + base64.StdEncoding.EncodeToString([]byte("user:pass")) + `"
-								}
-							}
-						}`),
-					},
-				},
-			},
-			expectedCreds: map[string]Credentials{
-				"registry.example.com": {
-					Username: "user",
-					Password: "pass",
-				},
-			},
-			expectError: false,
-		},
-		{
-			name: "invalid json",
-			secrets: []corev1.Secret{
-				{
-					ObjectMeta: metav1.ObjectMeta{Name: "test-secret"},
-					Data: map[string][]byte{
-						constants.DockerConfigName: []byte(`invalid json`),
-					},
-				},
-			},
-			expectedCreds: nil,
-			expectError:   true,
-		},
-		{
-			name: "invalid base64",
-			secrets: []corev1.Secret{
-				{
-					ObjectMeta: metav1.ObjectMeta{Name: "test-secret"},
-					Data: map[string][]byte{
-						constants.DockerConfigName: []byte(`{
-							"auths": {
-								"registry.example.com": {
-									"auth": "invalid-base64!"
-								}
-							}
-						}`),
-					},
-				},
-			},
-			expectedCreds: nil,
-			expectError:   true,
-		},
-		{
-			name: "invalid auth format",
-			secrets: []corev1.Secret{
-				{
-					ObjectMeta: metav1.ObjectMeta{Name: "test-secret"},
-					Data: map[string][]byte{
-						constants.DockerConfigName: []byte(`{
-							"auths": {
-								"registry.example.com": {
-									"auth": "` + base64.StdEncoding.EncodeToString([]byte("nocolon")) + `"
-								}
-							}
-						}`),
-					},
-				},
-			},
-			expectedCreds: nil,
-			expectError:   true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			creds, err := c.convertCredentials(tt.secrets)
-			if tt.expectError {
-				require.Error(t, err)
-			} else {
-				require.NoError(t, err)
-				require.Equal(t, tt.expectedCreds, creds)
-			}
-		})
-	}
 }
 
 func TestCredentials(t *testing.T) {
