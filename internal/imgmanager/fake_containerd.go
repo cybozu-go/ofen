@@ -21,7 +21,6 @@ type FakeContainerd struct {
 	pullErrorOverrides map[string]error
 	k8sClient          ctrl.Client
 	NodeName           string
-	tokens             map[string]Credentials
 	pullDelay          time.Duration // Simulate delay for pulling images
 	testEventsCh       chan *events.Envelope
 	testErrCh          chan error
@@ -98,26 +97,6 @@ func (f *FakeContainerd) SendTestEvent(event *events.Envelope) error {
 		}
 		f.testEventsCh <- event
 	}
-	return nil
-}
-
-func (f *FakeContainerd) SetCredentials(ctx context.Context, secrets []corev1.Secret) error {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-
-	for _, secret := range secrets {
-		if secret.Type != corev1.SecretTypeDockerConfigJson {
-			continue
-		}
-		if len(secret.Data) == 0 {
-			continue
-		}
-		// For simplicity, we assume the secret contains a single username and password.
-		username := string(secret.Data["username"])
-		password := string(secret.Data["password"])
-		f.tokens[secret.Name] = Credentials{Username: username, Password: password}
-	}
-
 	return nil
 }
 
