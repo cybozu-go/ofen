@@ -44,9 +44,9 @@ func NewContainerdEventWatcher(
 func (w *ContainerdEventWatcher) Start(ctx context.Context) error {
 	w.logger.Info("starting containerd event watcher")
 
-	eventsCh, error := w.imagePuller.SubscribeDeleteEvent(ctx)
-	if error != nil {
-		return fmt.Errorf("failed to subscribe to containerd events: %w", error)
+	eventsCh, err := w.imagePuller.SubscribeDeleteEvent(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to subscribe to containerd events: %w", err)
 	}
 
 	for {
@@ -56,7 +56,7 @@ func (w *ContainerdEventWatcher) Start(ctx context.Context) error {
 			return nil
 		case deleteImageName := <-eventsCh:
 			if deleteImageName != "" {
-				w.logger.Info("image deletion event received", "deleteImageName", deleteImageName)
+				w.logger.Info("received image deletion event", "imageName", deleteImageName)
 				w.notifyController(ctx, deleteImageName)
 			}
 		}
@@ -78,7 +78,7 @@ func (w *ContainerdEventWatcher) notifyController(ctx context.Context, imageName
 	for _, nis := range nodeImageSetList.Items {
 		for _, image := range nis.Spec.Images {
 			if image == imageName {
-				w.logger.Info("notifying controller to remove image from containerd", "imageName", imageName, "nodeImageSetName", nis.Name)
+				w.logger.Info("notifying controller of image removal from containerd", "imageName", imageName, "nodeImageSetName", nis.Name)
 				select {
 				case w.eventNotifyCh <- event.TypedGenericEvent[*ofenv1.NodeImageSet]{
 					Object: nis.DeepCopy(),

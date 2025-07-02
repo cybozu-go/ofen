@@ -142,7 +142,7 @@ func (p *ImagePuller) IsExistsNodeImageSetStatus(nodeImageSetName string) bool {
 func (p *ImagePuller) IsImageExists(ctx context.Context, ref string) bool {
 	exists, err := p.containerdClient.IsImageExists(ctx, ref)
 	if err != nil {
-		p.logger.Error(err, "Failed to check if image exists", "image", ref)
+		p.logger.Error(err, "failed to check image existence", "image", ref)
 		return false
 	}
 
@@ -184,7 +184,7 @@ func (p *ImagePuller) PullImage(ctx context.Context, nodeImageSetName, ref strin
 	if err != nil {
 		if errdefs.IsNotFound(err) && registryPolicy == ofenv1.RegistryPolicyMirrorOnly {
 			// If the image is not found and the policy is MirrorOnly, we treat it as a non-fatal error.
-			p.logger.Info("Image not found in mirror registry, continuing", "image", ref)
+			p.logger.Info("image not found in mirror registry, skipping pull", "image", ref)
 		} else {
 			imageStatus.SetError(err)
 		}
@@ -236,16 +236,16 @@ func (p *ImagePuller) SubscribeDeleteEvent(ctx context.Context) (<-chan string, 
 				return
 			case err := <-errorCh:
 				if err != nil {
-					p.logger.Error(err, "error receiving events from containerd")
+					p.logger.Error(err, "failed to receive events from containerd")
 				}
 			case e := <-eventsCh:
 				deleteImageName, err := handleDeleteEvent(e)
 				if err != nil {
-					p.logger.Error(err, "failed to handle delete event", "event", e)
+					p.logger.Error(err, "failed to process containerd delete event", "event", e)
 					continue
 				}
 				if deleteImageName != "" {
-					p.logger.Info("image deletion event received", "deleteImageName", deleteImageName)
+					p.logger.Info("processed image deletion event", "imageName", deleteImageName)
 					for _, nodeStatus := range p.status {
 						if imageStatus, ok := nodeStatus.Images[deleteImageName]; ok {
 							imageStatus.SetImagePulling(false)

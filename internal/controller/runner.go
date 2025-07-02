@@ -68,10 +68,9 @@ func (r *Runner) runWorker(ctx context.Context) {
 
 		func() {
 			defer r.queue.Done(item)
-
 			select {
 			case <-ctx.Done():
-				r.logger.Info("context done, skipping task processing")
+				r.logger.Info("context cancelled, skipping task processing")
 				return
 			default:
 			}

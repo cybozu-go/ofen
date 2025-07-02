@@ -111,7 +111,7 @@ func registryMirrorHosts(ctx context.Context, hostOpt config.HostOptions) docker
 	logger := log.FromContext(ctx)
 
 	return func(host string) ([]docker.RegistryHost, error) {
-		logger.Info("skipping upstream registry as mirror-only policy is set", "host", host)
+		logger.Info("skipping upstream registry due to mirror-only policy", "host", host)
 		hosts := config.ConfigureHosts(ctx, hostOpt)
 		rhosts, err := hosts(host)
 		if err != nil {
