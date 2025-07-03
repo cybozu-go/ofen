@@ -113,8 +113,7 @@ func TestNodeImageSetStatusConcurrentAccess(t *testing.T) {
 	t.Parallel()
 
 	nodeStatus := &NodeImageSetStatus{
-		Images: make(map[string]*ImagePullStatus),
-		mutex:  sync.RWMutex{},
+		Images: sync.Map{},
 	}
 
 	var wg sync.WaitGroup
@@ -141,8 +140,13 @@ func TestNodeImageSetStatusConcurrentAccess(t *testing.T) {
 
 	wg.Wait()
 
-	// Verify that we have the expected number of unique images
-	assert.LessOrEqual(t, len(nodeStatus.Images), 10)
+	// Verify that we have the expected number of unique images by counting
+	imageCount := 0
+	nodeStatus.Images.Range(func(key, value interface{}) bool {
+		imageCount++
+		return true
+	})
+	assert.LessOrEqual(t, imageCount, 10)
 }
 
 func TestImagePullerBasicOperations(t *testing.T) {
@@ -219,7 +223,9 @@ func TestImagePullerPullImageConcurrentPullingSameImage(t *testing.T) {
 	puller.NewNodeImageSetStatus(testNodeImageSetName)
 
 	// Manually set the image as pulling to test concurrent pull prevention
-	nodeStatus := puller.status[testNodeImageSetName]
+	value, ok := puller.status.Load(testNodeImageSetName)
+	require.True(t, ok)
+	nodeStatus := value.(*NodeImageSetStatus)
 	imageStatus := nodeStatus.GetOrCreateImageStatus(testImageName)
 	imageStatus.SetImagePulling(true)
 
@@ -252,7 +258,9 @@ func TestImagePullerGetImageStatusStates(t *testing.T) {
 
 	// Reset and test ImageDownloadInProgress state
 	fakeClient.SetImageExists(testImageName, false)
-	nodeStatus := puller.status[testNodeImageSetName]
+	value, ok := puller.status.Load(testNodeImageSetName)
+	require.True(t, ok)
+	nodeStatus := value.(*NodeImageSetStatus)
 	imageStatus := nodeStatus.GetOrCreateImageStatus(testImageName)
 	imageStatus.SetImagePulling(true)
 
@@ -298,7 +306,9 @@ func TestImagePullerSubscribeDeleteEvent(t *testing.T) {
 	defer cancel()
 
 	puller.NewNodeImageSetStatus(testNodeImageSetName)
-	nodeStatus := puller.status[testNodeImageSetName]
+	value, ok := puller.status.Load(testNodeImageSetName)
+	require.True(t, ok)
+	nodeStatus := value.(*NodeImageSetStatus)
 	imageStatus := nodeStatus.GetOrCreateImageStatus(testImageName)
 	imageStatus.SetImagePulling(true)
 	imageStatus.SetError(fmt.Errorf("some error"))
@@ -342,7 +352,9 @@ func TestImagePullerSubscribeDeleteEventMultipleNodeSets(t *testing.T) {
 	nodeImageSets := []string{"nodeset1", "nodeset2", "nodeset3"}
 	for _, nodeSet := range nodeImageSets {
 		puller.NewNodeImageSetStatus(nodeSet)
-		nodeStatus := puller.status[nodeSet]
+		value, ok := puller.status.Load(nodeSet)
+		require.True(t, ok)
+		nodeStatus := value.(*NodeImageSetStatus)
 		imageStatus := nodeStatus.GetOrCreateImageStatus(testImageName)
 		imageStatus.SetImagePulling(true)
 		imageStatus.SetError(fmt.Errorf("some error"))
@@ -366,7 +378,9 @@ func TestImagePullerSubscribeDeleteEventMultipleNodeSets(t *testing.T) {
 
 		// Verify that all node image sets were updated
 		for _, nodeSet := range nodeImageSets {
-			nodeStatus := puller.status[nodeSet]
+			value, ok := puller.status.Load(nodeSet)
+			require.True(t, ok)
+			nodeStatus := value.(*NodeImageSetStatus)
 			imageStatus, exists := nodeStatus.GetImageStatus(testImageName)
 			assert.True(t, exists)
 			assert.False(t, imageStatus.IsImagePulling())

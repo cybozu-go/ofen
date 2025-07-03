@@ -16,8 +16,7 @@ import (
 )
 
 type NodeImageSetStatus struct {
-	Images map[string]*ImagePullStatus
-	mutex  sync.RWMutex
+	Images sync.Map
 }
 
 type ImagePullStatus struct {
@@ -91,51 +90,47 @@ func (s *ImagePullStatus) TryStartPulling() bool {
 }
 
 func (n *NodeImageSetStatus) GetOrCreateImageStatus(ref string) *ImagePullStatus {
-	n.mutex.Lock()
-	defer n.mutex.Unlock()
-
-	if n.Images == nil {
-		n.Images = make(map[string]*ImagePullStatus)
+	if value, ok := n.Images.Load(ref); ok {
+		return value.(*ImagePullStatus)
 	}
 
-	if _, ok := n.Images[ref]; !ok {
-		n.Images[ref] = NewImagePullStatus()
+	newStatus := NewImagePullStatus()
+	if value, loaded := n.Images.LoadOrStore(ref, newStatus); loaded {
+		return value.(*ImagePullStatus)
 	}
-
-	return n.Images[ref]
+	return newStatus
 }
 
 func (n *NodeImageSetStatus) GetImageStatus(ref string) (*ImagePullStatus, bool) {
-	n.mutex.RLock()
-	defer n.mutex.RUnlock()
-
-	status, ok := n.Images[ref]
-	return status, ok
+	value, ok := n.Images.Load(ref)
+	if !ok {
+		return nil, false
+	}
+	return value.(*ImagePullStatus), true
 }
 
 type ImagePuller struct {
 	logger           logr.Logger
 	containerdClient ContainerdClient
-	status           map[string]*NodeImageSetStatus
+	status           sync.Map
 }
 
 func NewImagePuller(logger logr.Logger, containerdClient ContainerdClient) *ImagePuller {
 	return &ImagePuller{
 		logger:           logger,
 		containerdClient: containerdClient,
-		status:           make(map[string]*NodeImageSetStatus),
+		status:           sync.Map{},
 	}
 }
 
 func (p *ImagePuller) NewNodeImageSetStatus(nodeImageSetName string) {
-	p.status[nodeImageSetName] = &NodeImageSetStatus{
-		Images: make(map[string]*ImagePullStatus),
-		mutex:  sync.RWMutex{},
-	}
+	p.status.Store(nodeImageSetName, &NodeImageSetStatus{
+		Images: sync.Map{},
+	})
 }
 
 func (p *ImagePuller) IsExistsNodeImageSetStatus(nodeImageSetName string) bool {
-	_, ok := p.status[nodeImageSetName]
+	_, ok := p.status.Load(nodeImageSetName)
 	return ok
 }
 
@@ -150,7 +145,8 @@ func (p *ImagePuller) IsImageExists(ctx context.Context, ref string) bool {
 }
 
 func (p *ImagePuller) PullImage(ctx context.Context, nodeImageSetName, ref string, registryPolicy ofenv1.RegistryPolicy, secrets *[]corev1.Secret) error {
-	if _, ok := p.status[nodeImageSetName]; !ok {
+	value, ok := p.status.Load(nodeImageSetName)
+	if !ok {
 		return nil
 	}
 
@@ -162,7 +158,7 @@ func (p *ImagePuller) PullImage(ctx context.Context, nodeImageSetName, ref strin
 		return nil
 	}
 
-	nodeStatus := p.status[nodeImageSetName]
+	nodeStatus := value.(*NodeImageSetStatus)
 	imageStatus := nodeStatus.GetOrCreateImageStatus(ref)
 
 	if !imageStatus.TryStartPulling() {
@@ -194,7 +190,8 @@ func (p *ImagePuller) PullImage(ctx context.Context, nodeImageSetName, ref strin
 }
 
 func (p *ImagePuller) GetImageStatus(ctx context.Context, nodeImageSetName, imageName string) (string, string, error) {
-	if _, ok := p.status[nodeImageSetName]; !ok {
+	value, ok := p.status.Load(nodeImageSetName)
+	if !ok {
 		return "", "", nil
 	}
 
@@ -206,7 +203,7 @@ func (p *ImagePuller) GetImageStatus(ctx context.Context, nodeImageSetName, imag
 		return ofenv1.ImageDownloaded, "", nil
 	}
 
-	nodeStatus := p.status[nodeImageSetName]
+	nodeStatus := value.(*NodeImageSetStatus)
 	imageStatus, ok := nodeStatus.GetImageStatus(imageName)
 	if !ok {
 		return ofenv1.WaitingForImageDownload, "", nil
@@ -246,12 +243,15 @@ func (p *ImagePuller) SubscribeDeleteEvent(ctx context.Context) (<-chan string, 
 				}
 				if deleteImageName != "" {
 					p.logger.Info("processed image deletion event", "imageName", deleteImageName)
-					for _, nodeStatus := range p.status {
-						if imageStatus, ok := nodeStatus.Images[deleteImageName]; ok {
+					p.status.Range(func(key, value interface{}) bool {
+						nodeStatus := value.(*NodeImageSetStatus)
+						if value, ok := nodeStatus.Images.Load(deleteImageName); ok {
+							imageStatus := value.(*ImagePullStatus)
 							imageStatus.SetImagePulling(false)
 							imageStatus.SetError(nil)
 						}
-					}
+						return true
+					})
 
 					select {
 					case imageDeletionCh <- deleteImageName:
