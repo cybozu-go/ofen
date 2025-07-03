@@ -17,6 +17,11 @@ import (
 	ofenv1 "github.com/cybozu-go/ofen/api/v1"
 )
 
+const (
+	testNodeImageSetName = "test-nodeimageset"
+	testImageName        = "test-image:latest"
+)
+
 func TestImagePullStatusConcurrentAccess(t *testing.T) {
 	t.Parallel()
 
@@ -147,11 +152,9 @@ func TestImagePullerBasicOperations(t *testing.T) {
 	fakeClient := &FakeContainerd{}
 	puller := NewImagePuller(logger, fakeClient)
 
-	nodeImageSetName := "test-nodeimageset"
-
 	// Test NewNodeImageSetStatus
-	puller.NewNodeImageSetStatus(nodeImageSetName)
-	assert.True(t, puller.IsExistsNodeImageSetStatus(nodeImageSetName))
+	puller.NewNodeImageSetStatus(testNodeImageSetName)
+	assert.True(t, puller.IsExistsNodeImageSetStatus(testNodeImageSetName))
 	assert.False(t, puller.IsExistsNodeImageSetStatus("nonexistent"))
 }
 
@@ -163,15 +166,14 @@ func TestImagePullerIsImageExists(t *testing.T) {
 	puller := NewImagePuller(logger, fakeClient)
 
 	ctx := context.Background()
-	imageName := "test-image:latest"
 
 	// Image doesn't exist initially
-	exists := puller.IsImageExists(ctx, imageName)
+	exists := puller.IsImageExists(ctx, testImageName)
 	assert.False(t, exists)
 
 	// Add image to fake client
-	fakeClient.SetImageExists(imageName, true)
-	exists = puller.IsImageExists(ctx, imageName)
+	fakeClient.SetImageExists(testImageName, true)
+	exists = puller.IsImageExists(ctx, testImageName)
 	assert.True(t, exists)
 }
 
@@ -183,15 +185,13 @@ func TestImagePullerPullImageExistingImage(t *testing.T) {
 	puller := NewImagePuller(logger, fakeClient)
 
 	ctx := context.Background()
-	nodeImageSetName := "test-nodeimageset"
-	imageName := "test-image:latest"
 
-	puller.NewNodeImageSetStatus(nodeImageSetName)
+	puller.NewNodeImageSetStatus(testNodeImageSetName)
 
 	// Set image as already existing
-	fakeClient.SetImageExists(imageName, true)
+	fakeClient.SetImageExists(testImageName, true)
 
-	err := puller.PullImage(ctx, nodeImageSetName, imageName, ofenv1.RegistryPolicyDefault, nil)
+	err := puller.PullImage(ctx, testNodeImageSetName, testImageName, ofenv1.RegistryPolicyDefault, nil)
 	assert.NoError(t, err)
 }
 
@@ -203,10 +203,8 @@ func TestImagePullerPullImageNonexistentNodeSet(t *testing.T) {
 	puller := NewImagePuller(logger, fakeClient)
 
 	ctx := context.Background()
-	imageName := "test-image:latest"
-
 	// Try to pull for non-existent node set
-	err := puller.PullImage(ctx, "nonexistent", imageName, ofenv1.RegistryPolicyDefault, nil)
+	err := puller.PullImage(ctx, "nonexistent", testImageName, ofenv1.RegistryPolicyDefault, nil)
 	assert.NoError(t, err) // Should return nil without error
 }
 
@@ -218,17 +216,14 @@ func TestImagePullerPullImageConcurrentPullingSameImage(t *testing.T) {
 	puller := NewImagePuller(logger, fakeClient)
 
 	ctx := context.Background()
-	nodeImageSetName := "test-nodeimageset"
-	imageName := "test-image:latest"
-
-	puller.NewNodeImageSetStatus(nodeImageSetName)
+	puller.NewNodeImageSetStatus(testNodeImageSetName)
 
 	// Manually set the image as pulling to test concurrent pull prevention
-	nodeStatus := puller.status[nodeImageSetName]
-	imageStatus := nodeStatus.GetOrCreateImageStatus(imageName)
+	nodeStatus := puller.status[testNodeImageSetName]
+	imageStatus := nodeStatus.GetOrCreateImageStatus(testImageName)
 	imageStatus.SetImagePulling(true)
 
-	err := puller.PullImage(ctx, nodeImageSetName, imageName, ofenv1.RegistryPolicyDefault, nil)
+	err := puller.PullImage(ctx, testNodeImageSetName, testImageName, ofenv1.RegistryPolicyDefault, nil)
 	assert.NoError(t, err) // Should return nil (no-op) when already pulling
 }
 
@@ -240,31 +235,28 @@ func TestImagePullerGetImageStatusStates(t *testing.T) {
 	puller := NewImagePuller(logger, fakeClient)
 
 	ctx := context.Background()
-	nodeImageSetName := "test-nodeimageset"
-	imageName := "test-image:latest"
-
-	puller.NewNodeImageSetStatus(nodeImageSetName)
+	puller.NewNodeImageSetStatus(testNodeImageSetName)
 
 	// Test WaitingForImageDownload state (initial state)
-	status, message, err := puller.GetImageStatus(ctx, nodeImageSetName, imageName)
+	status, message, err := puller.GetImageStatus(ctx, testNodeImageSetName, testImageName)
 	assert.NoError(t, err)
 	assert.Equal(t, ofenv1.WaitingForImageDownload, status)
 	assert.Empty(t, message)
 
 	// Test ImageDownloaded state
-	fakeClient.SetImageExists(imageName, true)
-	status, message, err = puller.GetImageStatus(ctx, nodeImageSetName, imageName)
+	fakeClient.SetImageExists(testImageName, true)
+	status, message, err = puller.GetImageStatus(ctx, testNodeImageSetName, testImageName)
 	assert.NoError(t, err)
 	assert.Equal(t, ofenv1.ImageDownloaded, status)
 	assert.Empty(t, message)
 
 	// Reset and test ImageDownloadInProgress state
-	fakeClient.SetImageExists(imageName, false)
-	nodeStatus := puller.status[nodeImageSetName]
-	imageStatus := nodeStatus.GetOrCreateImageStatus(imageName)
+	fakeClient.SetImageExists(testImageName, false)
+	nodeStatus := puller.status[testNodeImageSetName]
+	imageStatus := nodeStatus.GetOrCreateImageStatus(testImageName)
 	imageStatus.SetImagePulling(true)
 
-	status, message, err = puller.GetImageStatus(ctx, nodeImageSetName, imageName)
+	status, message, err = puller.GetImageStatus(ctx, testNodeImageSetName, testImageName)
 	assert.NoError(t, err)
 	assert.Equal(t, ofenv1.ImageDownloadInProgress, status)
 	assert.Empty(t, message)
@@ -274,7 +266,7 @@ func TestImagePullerGetImageStatusStates(t *testing.T) {
 	testErr := fmt.Errorf("pull failed")
 	imageStatus.SetError(testErr)
 
-	status, message, err = puller.GetImageStatus(ctx, nodeImageSetName, imageName)
+	status, message, err = puller.GetImageStatus(ctx, testNodeImageSetName, testImageName)
 	assert.NoError(t, err)
 	assert.Equal(t, ofenv1.ImageDownloadFailed, status)
 	assert.Equal(t, "pull failed", message)
@@ -288,9 +280,8 @@ func TestImagePullerGetImageStatusNonexistentNodeImageSet(t *testing.T) {
 	puller := NewImagePuller(logger, fakeClient)
 
 	ctx := context.Background()
-	imageName := "test-image:latest"
 
-	status, message, err := puller.GetImageStatus(ctx, "nonexistent", imageName)
+	status, message, err := puller.GetImageStatus(ctx, "nonexistent", testImageName)
 	assert.NoError(t, err)
 	assert.Empty(t, status)
 	assert.Empty(t, message)
@@ -306,12 +297,9 @@ func TestImagePullerSubscribeDeleteEvent(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
-	nodeImageSetName := "test-nodeimageset"
-	imageName := "test-image:latest"
-
-	puller.NewNodeImageSetStatus(nodeImageSetName)
-	nodeStatus := puller.status[nodeImageSetName]
-	imageStatus := nodeStatus.GetOrCreateImageStatus(imageName)
+	puller.NewNodeImageSetStatus(testNodeImageSetName)
+	nodeStatus := puller.status[testNodeImageSetName]
+	imageStatus := nodeStatus.GetOrCreateImageStatus(testImageName)
 	imageStatus.SetImagePulling(true)
 	imageStatus.SetError(fmt.Errorf("some error"))
 
@@ -322,13 +310,14 @@ func TestImagePullerSubscribeDeleteEvent(t *testing.T) {
 	// Send a delete event
 	go func() {
 		time.Sleep(50 * time.Millisecond)
-		fakeClient.SendDeleteEvent(imageName)
+		err := fakeClient.SendDeleteEvent(testImageName)
+		require.NoError(t, err)
 	}()
 
 	// Wait for the delete event
 	select {
 	case deletedImage := <-deleteCh:
-		assert.Equal(t, imageName, deletedImage)
+		assert.Equal(t, testImageName, deletedImage)
 
 		// Verify that the image status was updated
 		assert.False(t, imageStatus.IsImagePulling())
@@ -349,14 +338,12 @@ func TestImagePullerSubscribeDeleteEventMultipleNodeSets(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
-	imageName := "test-image:latest"
-
 	// Create multiple node image sets with the same image
 	nodeImageSets := []string{"nodeset1", "nodeset2", "nodeset3"}
 	for _, nodeSet := range nodeImageSets {
 		puller.NewNodeImageSetStatus(nodeSet)
 		nodeStatus := puller.status[nodeSet]
-		imageStatus := nodeStatus.GetOrCreateImageStatus(imageName)
+		imageStatus := nodeStatus.GetOrCreateImageStatus(testImageName)
 		imageStatus.SetImagePulling(true)
 		imageStatus.SetError(fmt.Errorf("some error"))
 	}
@@ -368,18 +355,19 @@ func TestImagePullerSubscribeDeleteEventMultipleNodeSets(t *testing.T) {
 	// Send a delete event
 	go func() {
 		time.Sleep(50 * time.Millisecond)
-		fakeClient.SendDeleteEvent(imageName)
+		err := fakeClient.SendDeleteEvent(testImageName)
+		require.NoError(t, err)
 	}()
 
 	// Wait for the delete event
 	select {
 	case deletedImage := <-deleteCh:
-		assert.Equal(t, imageName, deletedImage)
+		assert.Equal(t, testImageName, deletedImage)
 
 		// Verify that all node image sets were updated
 		for _, nodeSet := range nodeImageSets {
 			nodeStatus := puller.status[nodeSet]
-			imageStatus, exists := nodeStatus.GetImageStatus(imageName)
+			imageStatus, exists := nodeStatus.GetImageStatus(testImageName)
 			assert.True(t, exists)
 			assert.False(t, imageStatus.IsImagePulling())
 			assert.NoError(t, imageStatus.GetError())
@@ -418,11 +406,9 @@ func TestImagePullerSubscribeDeleteEventContextCancellation(t *testing.T) {
 func TestHandleDeleteEventValidEvent(t *testing.T) {
 	t.Parallel()
 
-	imageName := "test-image:latest"
-
 	// Create a valid delete event
 	deleteEvent := &eventtypes.ImageDelete{
-		Name: imageName,
+		Name: testImageName,
 	}
 
 	anyEvent, err := typeurl.MarshalAny(deleteEvent)
@@ -434,7 +420,7 @@ func TestHandleDeleteEventValidEvent(t *testing.T) {
 
 	result, err := handleDeleteEvent(envelope)
 	assert.NoError(t, err)
-	assert.Equal(t, imageName, result)
+	assert.Equal(t, testImageName, result)
 }
 
 func TestHandleDeleteEventInvalidInputs(t *testing.T) {

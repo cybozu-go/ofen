@@ -3,13 +3,12 @@
 package applyconfigurations
 
 import (
-	runtime "k8s.io/apimachinery/pkg/runtime"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
-	testing "k8s.io/client-go/testing"
-
 	v1 "github.com/cybozu-go/ofen/api/v1"
 	apiv1 "github.com/cybozu-go/ofen/internal/applyconfigurations/api/v1"
 	internal "github.com/cybozu-go/ofen/internal/applyconfigurations/internal"
+	runtime "k8s.io/apimachinery/pkg/runtime"
+	schema "k8s.io/apimachinery/pkg/runtime/schema"
+	testing "k8s.io/client-go/testing"
 )
 
 // ForKind returns an apply configuration type for the given GroupVersionKind, or nil if no

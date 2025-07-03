@@ -184,16 +184,16 @@ func createRegistryMirrorHostsFile(registryName string, registryConfig string) (
 func TestNewContainerd(t *testing.T) {
 	t.Parallel()
 
-	config := &ContainerdConfig{
+	cfg := &ContainerdConfig{
 		SockAddr:  "/run/containerd/containerd.sock",
 		Namespace: "test-namespace",
 		HostDir:   "/etc/containerd/certs.d",
 	}
 
-	c := NewContainerd(config, nil)
+	c := NewContainerd(cfg, nil)
 
 	require.NotNil(t, c)
-	require.Equal(t, config, c.containerdConfig)
+	require.Equal(t, cfg, c.containerdConfig)
 	require.Nil(t, c.client)
 }
 
@@ -201,11 +201,11 @@ func TestSetupResolver(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	config := &ContainerdConfig{
+	cfg := &ContainerdConfig{
 		Namespace: "test",
 		HostDir:   "/tmp",
 	}
-	c := NewContainerd(config, nil)
+	c := NewContainerd(cfg, nil)
 
 	tokens := map[string]Credentials{
 		"registry.example.com": {
