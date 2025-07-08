@@ -136,37 +136,10 @@ var _ = Describe("NodeImageSet Controller", Serial, func() {
 				queue.ShutDown()
 			}()
 			time.Sleep(100 * time.Millisecond)
-
-			// Create a test node
-			node := &corev1.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: nodeName,
-					Labels: map[string]string{
-						"kubernetes.io/hostname": nodeName,
-					},
-				},
-				Status: corev1.NodeStatus{
-					Conditions: []corev1.NodeCondition{
-						{
-							Type:   corev1.NodeReady,
-							Status: corev1.ConditionTrue,
-						},
-					},
-					Images: []corev1.ContainerImage{},
-				},
-			}
-
-			_, err = ctrl.CreateOrUpdate(ctx, k8sClient, node, func() error {
-				return nil
-			})
-			Expect(err).NotTo(HaveOccurred())
 		})
 
 		AfterEach(func() {
 			stopFunc()
-			// Clean up the test node
-			err := deleteNode(ctx, nodeName)
-			Expect(err).NotTo(HaveOccurred())
 			time.Sleep(100 * time.Millisecond)
 		})
 
