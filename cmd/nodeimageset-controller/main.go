@@ -126,10 +126,8 @@ func main() {
 
 	runner := controller.NewRunner(
 		mgr.GetClient(),
-		containerdClient,
 		imagePuller,
 		ctrl.Log.WithName("runner").WithValues("nodeName", nodeName),
-		ch,
 		queue,
 		mgr.GetEventRecorderFor("image-pull-runner"),
 	)

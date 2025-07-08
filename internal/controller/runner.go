@@ -9,20 +9,17 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/event"
 
 	ofenv1 "github.com/cybozu-go/ofen/api/v1"
 	"github.com/cybozu-go/ofen/internal/imgmanager"
 )
 
 type Runner struct {
-	client           client.Client
-	containerdClient imgmanager.ContainerdClient
-	ImagePuller      *imgmanager.ImagePuller
-	logger           logr.Logger
-	channel          chan<- event.TypedGenericEvent[*ofenv1.NodeImageSet]
-	queue            workqueue.TypedRateLimitingInterface[Task]
-	recorder         record.EventRecorder
+	client      client.Client
+	ImagePuller *imgmanager.ImagePuller
+	logger      logr.Logger
+	queue       workqueue.TypedRateLimitingInterface[Task]
+	recorder    record.EventRecorder
 }
 
 type Task struct {
@@ -32,15 +29,13 @@ type Task struct {
 	Secrets          *[]corev1.Secret
 }
 
-func NewRunner(k8sClient client.Client, containerdClient imgmanager.ContainerdClient, imagePuller *imgmanager.ImagePuller, logger logr.Logger, channel chan<- event.TypedGenericEvent[*ofenv1.NodeImageSet], queue workqueue.TypedRateLimitingInterface[Task], recorder record.EventRecorder) *Runner {
+func NewRunner(k8sClient client.Client, imagePuller *imgmanager.ImagePuller, logger logr.Logger, queue workqueue.TypedRateLimitingInterface[Task], recorder record.EventRecorder) *Runner {
 	return &Runner{
-		client:           k8sClient,
-		containerdClient: containerdClient,
-		ImagePuller:      imagePuller,
-		logger:           logger,
-		channel:          channel,
-		queue:            queue,
-		recorder:         recorder,
+		client:      k8sClient,
+		ImagePuller: imagePuller,
+		logger:      logger,
+		queue:       queue,
+		recorder:    recorder,
 	}
 }
 
