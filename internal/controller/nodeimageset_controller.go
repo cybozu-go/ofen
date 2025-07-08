@@ -203,15 +203,15 @@ func (r *NodeImageSetReconciler) updateStatus(ctx context.Context, nodeImageSet 
 
 	if failedImage > 0 {
 		meta.SetStatusCondition(&nodeImageSet.Status.Conditions, metav1.Condition{
-			Type:    ofenv1.ConditionImageDownloadFailed,
-			Status:  metav1.ConditionTrue,
+			Type:    ofenv1.ConditionImageDownloadSucceeded,
+			Status:  metav1.ConditionFalse,
 			Reason:  "ImageDownloadFailed",
 			Message: "Some images failed to download",
 		})
 	} else {
 		meta.SetStatusCondition(&nodeImageSet.Status.Conditions, metav1.Condition{
-			Type:    ofenv1.ConditionImageDownloadFailed,
-			Status:  metav1.ConditionFalse,
+			Type:    ofenv1.ConditionImageDownloadSucceeded,
+			Status:  metav1.ConditionTrue,
 			Reason:  "NoImagePullFailed",
 			Message: "No image pull failed",
 		})

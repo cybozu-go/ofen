@@ -91,8 +91,8 @@ const (
 )
 
 const (
-	ConditionImageAvailable      = "ImageAvailable"
-	ConditionImageDownloadFailed = "ImageDownloadFailed"
+	ConditionImageAvailable         = "ImageAvailable"
+	ConditionImageDownloadSucceeded = "ImageDownloadSucceeded"
 )
 
 // +genclient

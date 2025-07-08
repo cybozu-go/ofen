@@ -294,9 +294,9 @@ var _ = Describe("NodeImageSet Controller", Serial, func() {
 				conditionAvailable := meta.FindStatusCondition(currentNis.Status.Conditions, ofenv1.ConditionImageAvailable)
 				g.Expect(conditionAvailable).NotTo(BeNil())
 				g.Expect(conditionAvailable.Status).To(Equal(metav1.ConditionTrue))
-				conditionDownloadFailed := meta.FindStatusCondition(currentNis.Status.Conditions, ofenv1.ConditionImageDownloadFailed)
-				g.Expect(conditionDownloadFailed).NotTo(BeNil())
-				g.Expect(conditionDownloadFailed.Status).To(Equal(metav1.ConditionFalse))
+				conditionDownloadSucceeded := meta.FindStatusCondition(currentNis.Status.Conditions, ofenv1.ConditionImageDownloadSucceeded)
+				g.Expect(conditionDownloadSucceeded).NotTo(BeNil())
+				g.Expect(conditionDownloadSucceeded.Status).To(Equal(metav1.ConditionTrue))
 			}).Should(Succeed())
 
 			By("cleaning up the NodeImageSet resource")

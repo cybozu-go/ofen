@@ -470,10 +470,14 @@ func calculateStatus(selectNodes []string, nodeImageSets *ofenv1.NodeImageSetLis
 			continue
 		}
 
+		if nodeImageSet.Status.Conditions == nil {
+			return status
+		}
+
 		if meta.IsStatusConditionTrue(nodeImageSet.Status.Conditions, ofenv1.ConditionImageAvailable) {
 			status.availableNodes++
 		}
-		if meta.IsStatusConditionTrue(nodeImageSet.Status.Conditions, ofenv1.ConditionImageDownloadFailed) {
+		if !meta.IsStatusConditionTrue(nodeImageSet.Status.Conditions, ofenv1.ConditionImageDownloadSucceeded) {
 			status.pullFailedNodes++
 		}
 		if !meta.IsStatusConditionTrue(nodeImageSet.Status.Conditions, ofenv1.ConditionImageAvailable) {

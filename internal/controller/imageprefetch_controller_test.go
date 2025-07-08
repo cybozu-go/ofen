@@ -455,9 +455,9 @@ var _ = Describe("ImagePrefetch Controller", Serial, func() {
 
 			By("updating nodeImageSet's status to image pull failed")
 			failedCondition := metav1.Condition{
-				Type:               ofenv1.ConditionImageDownloadFailed,
+				Type:               ofenv1.ConditionImageDownloadSucceeded,
 				Reason:             "test",
-				Status:             metav1.ConditionTrue,
+				Status:             metav1.ConditionFalse,
 				LastTransitionTime: metav1.Now(),
 			}
 			Eventually(func(g Gomega) {
@@ -494,7 +494,7 @@ var _ = Describe("ImagePrefetch Controller", Serial, func() {
 			}).Should(Succeed())
 
 			By("updating nodeImageSet's status to image available")
-			failedCondition.Status = metav1.ConditionFalse
+			failedCondition.Status = metav1.ConditionTrue
 			imageAvailableCondition := metav1.Condition{
 				Type:               ofenv1.ConditionImageAvailable,
 				Reason:             "test",
