@@ -191,22 +191,10 @@ func (r *NodeImageSetReconciler) updateStatus(ctx context.Context, nodeImageSet 
 			Reason:  "ImageDownloadComplete",
 			Message: "All images are downloadedImage",
 		})
-		meta.SetStatusCondition(&nodeImageSet.Status.Conditions, metav1.Condition{
-			Type:    ofenv1.ConditionImageDownloadComplete,
-			Status:  metav1.ConditionTrue,
-			Reason:  "ImageDownloadComplete",
-			Message: "All images are downloadedImage",
-		})
 		result = ctrl.Result{}
 	} else {
 		meta.SetStatusCondition(&nodeImageSet.Status.Conditions, metav1.Condition{
 			Type:    ofenv1.ConditionImageAvailable,
-			Status:  metav1.ConditionFalse,
-			Reason:  "ImageDownloadIncomplete",
-			Message: "Waiting for images to be downloadedImage",
-		})
-		meta.SetStatusCondition(&nodeImageSet.Status.Conditions, metav1.Condition{
-			Type:    ofenv1.ConditionImageDownloadComplete,
 			Status:  metav1.ConditionFalse,
 			Reason:  "ImageDownloadIncomplete",
 			Message: "Waiting for images to be downloadedImage",

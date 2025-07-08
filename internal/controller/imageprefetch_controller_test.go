@@ -501,12 +501,6 @@ var _ = Describe("ImagePrefetch Controller", Serial, func() {
 				Status:             metav1.ConditionTrue,
 				LastTransitionTime: metav1.Now(),
 			}
-			imageDownloadCompleteCondition := metav1.Condition{
-				Type:               ofenv1.ConditionImageDownloadComplete,
-				Reason:             "test",
-				Status:             metav1.ConditionTrue,
-				LastTransitionTime: metav1.Now(),
-			}
 
 			Eventually(func(g Gomega) {
 				nodeImageSets := &ofenv1.NodeImageSetList{}
@@ -519,7 +513,7 @@ var _ = Describe("ImagePrefetch Controller", Serial, func() {
 
 				for _, nodeImageSet := range nodeImageSets.Items {
 					nodeImageSet.Status.Conditions = []metav1.Condition{
-						failedCondition, imageAvailableCondition, imageDownloadCompleteCondition}
+						failedCondition, imageAvailableCondition}
 					err = k8sClient.Status().Update(ctx, &nodeImageSet)
 					Expect(err).NotTo(HaveOccurred())
 				}

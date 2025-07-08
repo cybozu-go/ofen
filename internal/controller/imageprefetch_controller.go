@@ -476,8 +476,7 @@ func calculateStatus(selectNodes []string, nodeImageSets *ofenv1.NodeImageSetLis
 		if meta.IsStatusConditionTrue(nodeImageSet.Status.Conditions, ofenv1.ConditionImageDownloadFailed) {
 			status.pullFailedNodes++
 		}
-		if meta.IsStatusConditionTrue(nodeImageSet.Status.Conditions, ofenv1.ConditionImageDownloadComplete) &&
-			!meta.IsStatusConditionTrue(nodeImageSet.Status.Conditions, ofenv1.ConditionImageAvailable) {
+		if !meta.IsStatusConditionTrue(nodeImageSet.Status.Conditions, ofenv1.ConditionImageAvailable) {
 			status.pullingNodes++
 		}
 	}
