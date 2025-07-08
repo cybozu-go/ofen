@@ -130,6 +130,11 @@ var _ = Describe("NodeImageSet Controller", Serial, func() {
 					panic(err)
 				}
 			}()
+
+			go func() {
+				<-ctx.Done()
+				queue.ShutDown()
+			}()
 			time.Sleep(100 * time.Millisecond)
 
 			// Create a test node

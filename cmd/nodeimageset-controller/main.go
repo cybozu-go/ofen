@@ -177,7 +177,15 @@ func main() {
 	}
 
 	setupLog.Info("starting nodeimageset controller", "nodeName", nodeName)
-	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
+	ctx := ctrl.SetupSignalHandler()
+
+	go func() {
+		<-ctx.Done()
+		setupLog.Info("shutting down queue")
+		queue.ShutDown()
+	}()
+
+	if err := mgr.Start(ctx); err != nil {
 		setupLog.Error(err, "problem running nodeimageset controller")
 		os.Exit(1)
 	}

@@ -47,19 +47,12 @@ func NewRunner(k8sClient client.Client, containerdClient imgmanager.ContainerdCl
 func (r *Runner) Start(ctx context.Context) error {
 	r.logger.Info("starting runner")
 	defer r.logger.Info("runner stopped")
-	defer r.queue.ShutDown()
 
 	r.runWorker(ctx)
 	return nil
 }
 
 func (r *Runner) runWorker(ctx context.Context) {
-	go func() {
-		<-ctx.Done()
-		r.logger.Info("context cancelled, shutting down queue")
-		r.queue.ShutDown()
-	}()
-
 	for {
 		item, shutdown := r.queue.Get()
 		if shutdown {
