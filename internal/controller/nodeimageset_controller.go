@@ -185,65 +185,58 @@ func (r *NodeImageSetReconciler) updateStatus(ctx context.Context, nodeImageSet 
 
 	if desiredImage == downloadedImage {
 		logger.Info("all images are downloadedImage")
-		nodeImageSetSSA.Status.WithConditions(
-			mergeCondition(nodeImageSet.Status.Conditions,
-				metav1apply.Condition().
-					WithType(ofenv1.ConditionImageAvailable).
-					WithStatus(metav1.ConditionTrue).
-					WithReason("ImageDownloadComplete").
-					WithMessage("All images are downloadedImage"),
-			),
-		)
-		nodeImageSetSSA.Status.WithConditions(
-			mergeCondition(nodeImageSet.Status.Conditions,
-				metav1apply.Condition().
-					WithType(ofenv1.ConditionImageDownloadComplete).
-					WithStatus(metav1.ConditionTrue).
-					WithReason("ImageDownloadComplete").
-					WithMessage("All images are downloadedImage"),
-			),
-		)
+		meta.SetStatusCondition(&nodeImageSet.Status.Conditions, metav1.Condition{
+			Type:    ofenv1.ConditionImageAvailable,
+			Status:  metav1.ConditionTrue,
+			Reason:  "ImageDownloadComplete",
+			Message: "All images are downloadedImage",
+		})
+		meta.SetStatusCondition(&nodeImageSet.Status.Conditions, metav1.Condition{
+			Type:    ofenv1.ConditionImageDownloadComplete,
+			Status:  metav1.ConditionTrue,
+			Reason:  "ImageDownloadComplete",
+			Message: "All images are downloadedImage",
+		})
 		result = ctrl.Result{}
 	} else {
-		nodeImageSetSSA.Status.WithConditions(
-			mergeCondition(nodeImageSet.Status.Conditions,
-				metav1apply.Condition().
-					WithType(ofenv1.ConditionImageAvailable).
-					WithStatus(metav1.ConditionFalse).
-					WithReason("ImageDownloadIncomplete").
-					WithMessage("Waiting for images to be downloadedImage"),
-			),
-		)
-		nodeImageSetSSA.Status.WithConditions(
-			mergeCondition(nodeImageSet.Status.Conditions,
-				metav1apply.Condition().
-					WithType(ofenv1.ConditionImageDownloadComplete).
-					WithStatus(metav1.ConditionFalse).
-					WithReason("ImageDownloadIncomplete").
-					WithMessage("Waiting for images to be downloadedImage"),
-			),
-		)
+		meta.SetStatusCondition(&nodeImageSet.Status.Conditions, metav1.Condition{
+			Type:    ofenv1.ConditionImageAvailable,
+			Status:  metav1.ConditionFalse,
+			Reason:  "ImageDownloadIncomplete",
+			Message: "Waiting for images to be downloadedImage",
+		})
+		meta.SetStatusCondition(&nodeImageSet.Status.Conditions, metav1.Condition{
+			Type:    ofenv1.ConditionImageDownloadComplete,
+			Status:  metav1.ConditionFalse,
+			Reason:  "ImageDownloadIncomplete",
+			Message: "Waiting for images to be downloadedImage",
+		})
 	}
 
 	if failedImage > 0 {
-		nodeImageSetSSA.Status.WithConditions(
-			mergeCondition(nodeImageSet.Status.Conditions,
-				metav1apply.Condition().
-					WithType(ofenv1.ConditionImageDownloadFailed).
-					WithStatus(metav1.ConditionTrue).
-					WithReason("ImageDownloadFailed").
-					WithMessage("Some images failed to download"),
-			),
-		)
+		meta.SetStatusCondition(&nodeImageSet.Status.Conditions, metav1.Condition{
+			Type:    ofenv1.ConditionImageDownloadFailed,
+			Status:  metav1.ConditionTrue,
+			Reason:  "ImageDownloadFailed",
+			Message: "Some images failed to download",
+		})
 	} else {
+		meta.SetStatusCondition(&nodeImageSet.Status.Conditions, metav1.Condition{
+			Type:    ofenv1.ConditionImageDownloadFailed,
+			Status:  metav1.ConditionFalse,
+			Reason:  "NoImagePullFailed",
+			Message: "No image pull failed",
+		})
+	}
+
+	for _, condition := range nodeImageSet.Status.Conditions {
 		nodeImageSetSSA.Status.WithConditions(
-			mergeCondition(nodeImageSet.Status.Conditions,
-				metav1apply.Condition().
-					WithType(ofenv1.ConditionImageDownloadFailed).
-					WithStatus(metav1.ConditionFalse).
-					WithReason("NoImagePullFailed").
-					WithMessage("No image pull failed"),
-			),
+			metav1apply.Condition().
+				WithType(condition.Type).
+				WithStatus(condition.Status).
+				WithReason(condition.Reason).
+				WithMessage(condition.Message).
+				WithLastTransitionTime(condition.LastTransitionTime),
 		)
 	}
 
@@ -273,27 +266,6 @@ func (r *NodeImageSetReconciler) calculateImageStatus(ctx context.Context, nis *
 		}
 	}
 	return downloadedImage, failed
-}
-
-func mergeCondition(existingConditions []metav1.Condition, condition *metav1apply.ConditionApplyConfiguration) *metav1apply.ConditionApplyConfiguration {
-	if condition == nil {
-		return condition
-	}
-
-	if condition.LastTransitionTime == nil {
-		if condition.Type != nil && condition.Status != nil {
-			existingCondition := meta.FindStatusCondition(existingConditions, *condition.Type)
-			if existingCondition != nil && existingCondition.Status == *condition.Status {
-				condition.WithLastTransitionTime(existingCondition.LastTransitionTime)
-			} else {
-				condition.WithLastTransitionTime(metav1.NewTime(time.Now()))
-			}
-		} else {
-			condition.WithLastTransitionTime(metav1.NewTime(time.Now()))
-		}
-	}
-
-	return condition
 }
 
 func (r *NodeImageSetReconciler) applyNodeImageSetStatus(ctx context.Context, nodeImageSetSSA *ofenv1apply.NodeImageSetApplyConfiguration, name string) error {
