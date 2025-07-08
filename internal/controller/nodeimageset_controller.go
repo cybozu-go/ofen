@@ -63,6 +63,7 @@ func (r *NodeImageSetReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	if nodeImageSet.DeletionTimestamp != nil {
 		if controllerutil.ContainsFinalizer(&nodeImageSet, constants.NodeImageSetFinalizer) {
 			logger.Info("starting finalization")
+			r.ImagePuller.DeleteNodeImageSetStatus(nodeImageSet.Name)
 			controllerutil.RemoveFinalizer(&nodeImageSet, constants.NodeImageSetFinalizer)
 			if err := r.Update(ctx, &nodeImageSet); err != nil {
 				return ctrl.Result{}, err

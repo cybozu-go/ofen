@@ -162,6 +162,23 @@ func TestImagePullerBasicOperations(t *testing.T) {
 	assert.False(t, puller.IsExistsNodeImageSetStatus("nonexistent"))
 }
 
+func TestImagePullerDeleteNodeImageSetStatus(t *testing.T) {
+	t.Parallel()
+
+	logger := logr.Discard()
+	fakeClient := &FakeContainerd{}
+	puller := NewImagePuller(logger, fakeClient)
+
+	puller.NewNodeImageSetStatus(testNodeImageSetName)
+	assert.True(t, puller.IsExistsNodeImageSetStatus(testNodeImageSetName))
+
+	puller.DeleteNodeImageSetStatus(testNodeImageSetName)
+	assert.False(t, puller.IsExistsNodeImageSetStatus(testNodeImageSetName))
+
+	puller.DeleteNodeImageSetStatus("nonexistent")
+	assert.False(t, puller.IsExistsNodeImageSetStatus("nonexistent"))
+}
+
 func TestImagePullerIsImageExists(t *testing.T) {
 	t.Parallel()
 

@@ -134,6 +134,10 @@ func (p *ImagePuller) IsExistsNodeImageSetStatus(nodeImageSetName string) bool {
 	return ok
 }
 
+func (p *ImagePuller) DeleteNodeImageSetStatus(nodeImageSetName string) {
+	p.status.LoadAndDelete(nodeImageSetName)
+}
+
 func (p *ImagePuller) IsImageExists(ctx context.Context, ref string) bool {
 	exists, err := p.containerdClient.IsImageExists(ctx, ref)
 	if err != nil {
