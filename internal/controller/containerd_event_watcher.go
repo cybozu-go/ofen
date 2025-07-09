@@ -19,7 +19,7 @@ type ContainerdEventWatcher struct {
 	containerdClient imgmanager.ContainerdClient
 	imagePuller      *imgmanager.ImagePuller
 	logger           logr.Logger
-	NodeName         string
+	nodeName         string
 	eventNotifyCh    chan<- event.TypedGenericEvent[*ofenv1.NodeImageSet]
 }
 
@@ -28,7 +28,7 @@ func NewContainerdEventWatcher(
 	containerdClient imgmanager.ContainerdClient,
 	imagePuller *imgmanager.ImagePuller,
 	logger logr.Logger,
-	NodeName string,
+	nodeName string,
 	eventNotifyCh chan<- event.TypedGenericEvent[*ofenv1.NodeImageSet],
 ) *ContainerdEventWatcher {
 	return &ContainerdEventWatcher{
@@ -36,7 +36,7 @@ func NewContainerdEventWatcher(
 		containerdClient: containerdClient,
 		imagePuller:      imagePuller,
 		logger:           logger,
-		NodeName:         NodeName,
+		nodeName:         nodeName,
 		eventNotifyCh:    eventNotifyCh,
 	}
 }
@@ -67,11 +67,11 @@ func (w *ContainerdEventWatcher) notifyController(ctx context.Context, imageName
 	var nodeImageSetList ofenv1.NodeImageSetList
 	err := w.k8sClient.List(ctx, &nodeImageSetList, &client.ListOptions{
 		LabelSelector: labels.SelectorFromSet(map[string]string{
-			constants.NodeName: w.NodeName,
+			constants.NodeName: w.nodeName,
 		}),
 	})
 	if err != nil {
-		w.logger.Error(err, "failed to list NodeImageSet for node", "nodeName", w.NodeName)
+		w.logger.Error(err, "failed to list NodeImageSet for node", "nodeName", w.nodeName)
 		return
 	}
 
