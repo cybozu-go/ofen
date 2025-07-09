@@ -90,10 +90,6 @@ func (s *ImagePullStatus) TryStartPulling() bool {
 }
 
 func (n *NodeImageSetStatus) GetOrCreateImageStatus(ref string) *ImagePullStatus {
-	if value, ok := n.Images.Load(ref); ok {
-		return value.(*ImagePullStatus)
-	}
-
 	newStatus := NewImagePullStatus()
 	if value, loaded := n.Images.LoadOrStore(ref, newStatus); loaded {
 		return value.(*ImagePullStatus)
