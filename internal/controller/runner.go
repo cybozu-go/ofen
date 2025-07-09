@@ -12,7 +12,7 @@ import (
 )
 
 type Runner struct {
-	ImagePuller *imgmanager.ImagePuller
+	imagePuller *imgmanager.ImagePuller
 	logger      logr.Logger
 	queue       workqueue.TypedRateLimitingInterface[imgmanager.Task]
 	recorder    record.EventRecorder
@@ -20,7 +20,7 @@ type Runner struct {
 
 func NewRunner(imagePuller *imgmanager.ImagePuller, logger logr.Logger, queue workqueue.TypedRateLimitingInterface[imgmanager.Task], recorder record.EventRecorder) *Runner {
 	return &Runner{
-		ImagePuller: imagePuller,
+		imagePuller: imagePuller,
 		logger:      logger,
 		queue:       queue,
 		recorder:    recorder,
@@ -65,13 +65,13 @@ func (r *Runner) runWorker(ctx context.Context) {
 func (r *Runner) processTask(ctx context.Context, task imgmanager.Task) error {
 	r.logger.Info("processing image", "task", task)
 
-	if exists := r.ImagePuller.IsImageExists(ctx, task.Ref); exists {
+	if exists := r.imagePuller.IsImageExists(ctx, task.Ref); exists {
 		r.logger.Info("image already exists", "image", task.Ref)
 		return nil
 	}
 
 	r.recorder.Eventf(task.NodeImageSet, corev1.EventTypeNormal, "ImageDownloading", "downloading image %s on %s", task.Ref, task.NodeImageSet.Spec.NodeName)
-	err := r.ImagePuller.PullImage(ctx, task.NodeImageSet.Name, task.Ref, task.RegistryPolicy, task.Secrets)
+	err := r.imagePuller.PullImage(ctx, task.NodeImageSet.Name, task.Ref, task.RegistryPolicy, task.Secrets)
 	if err != nil {
 		r.recorder.Eventf(task.NodeImageSet, corev1.EventTypeWarning, "ImageDownloadFailed", "failed to download image %s: %v on %s", task.Ref, err, task.NodeImageSet.Spec.NodeName)
 		return err
