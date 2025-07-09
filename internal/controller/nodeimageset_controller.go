@@ -74,8 +74,7 @@ func (r *NodeImageSetReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, nil
 	}
 
-	if !controllerutil.ContainsFinalizer(&nodeImageSet, constants.NodeImageSetFinalizer) {
-		controllerutil.AddFinalizer(&nodeImageSet, constants.NodeImageSetFinalizer)
+	if controllerutil.AddFinalizer(&nodeImageSet, constants.NodeImageSetFinalizer) {
 		err := r.Update(ctx, &nodeImageSet)
 		if err != nil {
 			logger.Error(err, "failed to add finalizer")
