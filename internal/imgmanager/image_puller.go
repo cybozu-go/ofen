@@ -3,6 +3,7 @@ package imgmanager
 import (
 	"context"
 	"fmt"
+	"slices"
 	"sync"
 
 	eventtypes "github.com/containerd/containerd/api/events"
@@ -128,6 +129,28 @@ func (p *ImagePuller) NewNodeImageSetStatus(nodeImageSetName string) {
 func (p *ImagePuller) IsExistsNodeImageSetStatus(nodeImageSetName string) bool {
 	_, ok := p.status.Load(nodeImageSetName)
 	return ok
+}
+
+func (p *ImagePuller) UpdateNodeImageSetStatus(nodeImageSetName string, images []string) {
+	value, ok := p.status.Load(nodeImageSetName)
+	if !ok {
+		return
+	}
+
+	nodeStatus := value.(*NodeImageSetStatus)
+	nodeStatus.Images.Range(func(key, value any) bool {
+		if slices.Contains(images, key.(string)) {
+			return true
+		}
+		nodeStatus.Images.Delete(key)
+		return true
+	})
+
+	for _, ref := range images {
+		if _, ok := nodeStatus.Images.Load(ref); !ok {
+			nodeStatus.GetOrCreateImageStatus(ref)
+		}
+	}
 }
 
 func (p *ImagePuller) DeleteNodeImageSetStatus(nodeImageSetName string) {

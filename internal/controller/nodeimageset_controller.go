@@ -112,6 +112,10 @@ func (r *NodeImageSetReconciler) reconcileNodeImageSet(ctx context.Context, node
 		r.ImagePuller.NewNodeImageSetStatus(nodeImageSet.Name)
 	}
 
+	if nodeImageSet.Generation != nodeImageSet.Status.ObservedGeneration {
+		r.ImagePuller.UpdateNodeImageSetStatus(nodeImageSet.Name, nodeImageSet.Spec.Images)
+	}
+
 	pendingImages := r.collectPendingImages(ctx, nodeImageSet)
 	if len(pendingImages) == 0 {
 		logger.Info("no images to process")

@@ -510,3 +510,128 @@ func TestHandleDeleteEventUnsupportedEventType(t *testing.T) {
 	assert.Empty(t, result)
 	assert.Contains(t, err.Error(), "unsupported event type")
 }
+
+func TestImagePullerUpdateNodeImageSetStatus(t *testing.T) {
+	t.Parallel()
+
+	logger := logr.Discard()
+	fakeClient := &FakeContainerd{}
+	puller := NewImagePuller(logger, fakeClient)
+
+	t.Run("nonexistent node image set", func(t *testing.T) {
+		puller.UpdateNodeImageSetStatus("nonexistent", []string{"image1", "image2"})
+	})
+
+	t.Run("add new images", func(t *testing.T) {
+		puller.NewNodeImageSetStatus(testNodeImageSetName)
+
+		images := []string{"image1:latest", "image2:latest", "image3:latest"}
+		puller.UpdateNodeImageSetStatus(testNodeImageSetName, images)
+
+		value, ok := puller.status.Load(testNodeImageSetName)
+		require.True(t, ok)
+
+		nodeStatus := value.(*NodeImageSetStatus)
+		for _, image := range images {
+			_, exists := nodeStatus.GetImageStatus(image)
+			assert.True(t, exists, "image %s should exist", image)
+		}
+	})
+
+	t.Run("remove images not in new list", func(t *testing.T) {
+		puller.NewNodeImageSetStatus(testNodeImageSetName + "-remove")
+
+		nodeSetName := testNodeImageSetName + "-remove"
+		initialImages := []string{"image1:latest", "image2:latest", "image3:latest"}
+		puller.UpdateNodeImageSetStatus(nodeSetName, initialImages)
+
+		newImages := []string{"image1:latest", "image4:latest"}
+		puller.UpdateNodeImageSetStatus(nodeSetName, newImages)
+
+		value, ok := puller.status.Load(nodeSetName)
+		require.True(t, ok)
+
+		nodeStatus := value.(*NodeImageSetStatus)
+
+		_, exists := nodeStatus.GetImageStatus("image1:latest")
+		assert.True(t, exists)
+
+		_, exists = nodeStatus.GetImageStatus("image4:latest")
+		assert.True(t, exists)
+
+		_, exists = nodeStatus.GetImageStatus("image2:latest")
+		assert.False(t, exists)
+
+		_, exists = nodeStatus.GetImageStatus("image3:latest")
+		assert.False(t, exists)
+	})
+
+	t.Run("preserve existing image status", func(t *testing.T) {
+		puller.NewNodeImageSetStatus(testNodeImageSetName + "-preserve")
+
+		nodeSetName := testNodeImageSetName + "-preserve"
+		images := []string{"image1:latest"}
+		puller.UpdateNodeImageSetStatus(nodeSetName, images)
+
+		value, ok := puller.status.Load(nodeSetName)
+		require.True(t, ok)
+
+		nodeStatus := value.(*NodeImageSetStatus)
+		imageStatus, exists := nodeStatus.GetImageStatus("image1:latest")
+		require.True(t, exists)
+
+		imageStatus.SetImagePulling(true)
+		imageStatus.SetError(fmt.Errorf("test error"))
+
+		puller.UpdateNodeImageSetStatus(nodeSetName, images)
+
+		imageStatus, exists = nodeStatus.GetImageStatus("image1:latest")
+		require.True(t, exists)
+		assert.True(t, imageStatus.IsImagePulling())
+		assert.NotNil(t, imageStatus.GetError())
+	})
+
+	t.Run("empty images list", func(t *testing.T) {
+		puller.NewNodeImageSetStatus(testNodeImageSetName + "-empty")
+
+		nodeSetName := testNodeImageSetName + "-empty"
+		initialImages := []string{"image1:latest", "image2:latest"}
+		puller.UpdateNodeImageSetStatus(nodeSetName, initialImages)
+
+		puller.UpdateNodeImageSetStatus(nodeSetName, []string{})
+
+		value, ok := puller.status.Load(nodeSetName)
+		require.True(t, ok)
+
+		nodeStatus := value.(*NodeImageSetStatus)
+
+		_, exists := nodeStatus.GetImageStatus("image1:latest")
+		assert.False(t, exists)
+
+		_, exists = nodeStatus.GetImageStatus("image2:latest")
+		assert.False(t, exists)
+	})
+
+	t.Run("concurrent updates", func(t *testing.T) {
+		puller.NewNodeImageSetStatus(testNodeImageSetName + "-concurrent")
+
+		nodeSetName := testNodeImageSetName + "-concurrent"
+		var wg sync.WaitGroup
+		numGoroutines := 10
+
+		wg.Add(numGoroutines)
+		for i := 0; i < numGoroutines; i++ {
+			go func(id int) {
+				defer wg.Done()
+				images := []string{fmt.Sprintf("image%d:latest", id)}
+				puller.UpdateNodeImageSetStatus(nodeSetName, images)
+			}(i)
+		}
+
+		wg.Wait()
+
+		value, ok := puller.status.Load(nodeSetName)
+		require.True(t, ok)
+		assert.NotNil(t, value)
+	})
+}
