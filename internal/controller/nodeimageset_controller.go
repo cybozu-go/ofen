@@ -108,13 +108,13 @@ func (r *NodeImageSetReconciler) reconcileNodeImageSet(ctx context.Context, node
 	}
 
 	if !r.ImagePuller.IsExistsNodeImageSetStatus(nodeImageSet.Name) {
-		logger.Info("initializing NodeImageSet status", "nodeImageSet", nodeImageSet.Name)
+		logger.Info("initializing NodeImageSet status")
 		r.ImagePuller.NewNodeImageSetStatus(nodeImageSet.Name)
 	}
 
 	pendingImages := r.collectPendingImages(ctx, nodeImageSet)
 	if len(pendingImages) == 0 {
-		logger.Info("no images to process", "nodeImageSet", nodeImageSet.Name)
+		logger.Info("no images to process")
 		return nil
 	}
 
@@ -152,7 +152,7 @@ func (r *NodeImageSetReconciler) collectPendingImages(ctx context.Context, nodeI
 
 func (r *NodeImageSetReconciler) updateStatus(ctx context.Context, nodeImageSet *ofenv1.NodeImageSet) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
-	logger.Info("updating NodeImageSet status", "name", nodeImageSet.Name)
+	logger.Info("updating NodeImageSet status")
 	result := ctrl.Result{RequeueAfter: 10 * time.Second}
 
 	desiredImage := len(nodeImageSet.Spec.Images)
