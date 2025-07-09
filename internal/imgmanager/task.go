@@ -7,8 +7,8 @@ import (
 )
 
 type Task struct {
-	Ref              string
-	RegistryPolicy   ofenv1.RegistryPolicy
-	NodeImageSetName string
-	Secrets          *[]corev1.Secret
+	Ref            string
+	RegistryPolicy ofenv1.RegistryPolicy
+	NodeImageSet   *ofenv1.NodeImageSet
+	Secrets        *[]corev1.Secret
 }

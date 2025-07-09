@@ -5,26 +5,21 @@ import (
 
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	ofenv1 "github.com/cybozu-go/ofen/api/v1"
 	"github.com/cybozu-go/ofen/internal/imgmanager"
 )
 
 type Runner struct {
-	client      client.Client
 	ImagePuller *imgmanager.ImagePuller
 	logger      logr.Logger
 	queue       workqueue.TypedRateLimitingInterface[imgmanager.Task]
 	recorder    record.EventRecorder
 }
 
-func NewRunner(k8sClient client.Client, imagePuller *imgmanager.ImagePuller, logger logr.Logger, queue workqueue.TypedRateLimitingInterface[imgmanager.Task], recorder record.EventRecorder) *Runner {
+func NewRunner(imagePuller *imgmanager.ImagePuller, logger logr.Logger, queue workqueue.TypedRateLimitingInterface[imgmanager.Task], recorder record.EventRecorder) *Runner {
 	return &Runner{
-		client:      k8sClient,
 		ImagePuller: imagePuller,
 		logger:      logger,
 		queue:       queue,
@@ -70,34 +65,19 @@ func (r *Runner) runWorker(ctx context.Context) {
 func (r *Runner) processTask(ctx context.Context, task imgmanager.Task) error {
 	r.logger.Info("processing image", "task", task)
 
-	var nodeImageSet ofenv1.NodeImageSet
-	err := r.client.Get(ctx, client.ObjectKey{Name: task.NodeImageSetName}, &nodeImageSet)
-	if err != nil {
-		if apierrors.IsNotFound(err) {
-			r.logger.Info("skipping task for deleted NodeImageSet", "name", task.NodeImageSetName)
-			return nil
-		}
-		return err
-	}
-
-	if nodeImageSet.DeletionTimestamp != nil {
-		r.logger.Info("skipping task for NodeImageSet that is being deleted", "name", task.NodeImageSetName)
-		return nil
-	}
-
 	if exists := r.ImagePuller.IsImageExists(ctx, task.Ref); exists {
 		r.logger.Info("image already exists", "image", task.Ref)
 		return nil
 	}
 
-	r.recorder.Eventf(&nodeImageSet, corev1.EventTypeNormal, "ImageDownloading", "downloading image %s on %s", task.Ref, nodeImageSet.Spec.NodeName)
-	err = r.ImagePuller.PullImage(ctx, nodeImageSet.Name, task.Ref, task.RegistryPolicy, task.Secrets)
+	r.recorder.Eventf(task.NodeImageSet, corev1.EventTypeNormal, "ImageDownloading", "downloading image %s on %s", task.Ref, task.NodeImageSet.Spec.NodeName)
+	err := r.ImagePuller.PullImage(ctx, task.NodeImageSet.Name, task.Ref, task.RegistryPolicy, task.Secrets)
 	if err != nil {
-		r.recorder.Eventf(&nodeImageSet, corev1.EventTypeWarning, "ImageDownloadFailed", "failed to download image %s: %v on %s", task.Ref, err, nodeImageSet.Spec.NodeName)
+		r.recorder.Eventf(task.NodeImageSet, corev1.EventTypeWarning, "ImageDownloadFailed", "failed to download image %s: %v on %s", task.Ref, err, task.NodeImageSet.Spec.NodeName)
 		return err
 	}
 
-	r.recorder.Eventf(&nodeImageSet, corev1.EventTypeNormal, "ImageDownloaded", "successfully downloaded image %s on %s", task.Ref, nodeImageSet.Spec.NodeName)
+	r.recorder.Eventf(task.NodeImageSet, corev1.EventTypeNormal, "ImageDownloaded", "successfully downloaded image %s on %s", task.Ref, task.NodeImageSet.Spec.NodeName)
 	r.logger.Info("successfully processed image", "image", task.Ref)
 	return nil
 }

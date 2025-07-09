@@ -114,7 +114,7 @@ var _ = Describe("NodeImageSet Controller", Serial, func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			// Create and start runner
-			runner := NewRunner(mgr.GetClient(), imagePuller, ctrl.Log.WithName("test-runner"), queue, mgr.GetEventRecorderFor("test-runner"))
+			runner := NewRunner(imagePuller, ctrl.Log.WithName("test-runner"), queue, mgr.GetEventRecorderFor("test-runner"))
 			err = mgr.Add(runner)
 			Expect(err).NotTo(HaveOccurred())
 

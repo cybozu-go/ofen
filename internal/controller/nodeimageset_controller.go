@@ -124,10 +124,10 @@ func (r *NodeImageSetReconciler) reconcileNodeImageSet(ctx context.Context, node
 
 	for _, image := range pendingImages {
 		task := imgmanager.Task{
-			Ref:              image,
-			RegistryPolicy:   nodeImageSet.Spec.RegistryPolicy,
-			NodeImageSetName: nodeImageSet.Name,
-			Secrets:          &secrets,
+			Ref:            image,
+			RegistryPolicy: nodeImageSet.Spec.RegistryPolicy,
+			NodeImageSet:   nodeImageSet,
+			Secrets:        &secrets,
 		}
 		r.Queue.Add(task)
 	}
