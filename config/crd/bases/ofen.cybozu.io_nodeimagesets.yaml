@@ -26,7 +26,7 @@ spec:
       name: Failed
       type: integer
     - jsonPath: .spec.nodeName
-      name: NODE
+      name: Node
       priority: 1
       type: string
     name: v1

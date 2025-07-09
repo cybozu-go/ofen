@@ -103,7 +103,7 @@ const (
 // +kubebuilder:printcolumn:name="Desired",type="integer",JSONPath=".status.desiredImages",format="int32"
 // +kubebuilder:printcolumn:name="Available",type="integer",JSONPath=".status.availableImages"
 // +kubebuilder:printcolumn:name="Failed",type="integer",JSONPath=".status.downloadFailedImages"
-// +kubebuilder:printcolumn:name="NODE",type="string",JSONPath=".spec.nodeName",priority=1
+// +kubebuilder:printcolumn:name="Node",type="string",JSONPath=".spec.nodeName",priority=1
 
 // NodeImageSet is the Schema for the nodeimagesets API
 type NodeImageSet struct {
