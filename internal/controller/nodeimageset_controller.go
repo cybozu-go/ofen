@@ -38,7 +38,7 @@ type NodeImageSetReconciler struct {
 	ImagePuller      *imgmanager.ImagePuller
 	ContainerdClient imgmanager.ContainerdClient
 	Recorder         record.EventRecorder
-	Queue            workqueue.TypedRateLimitingInterface[Task]
+	Queue            workqueue.TypedRateLimitingInterface[imgmanager.Task]
 }
 
 // +kubebuilder:rbac:groups=ofen.cybozu.io,resources=nodeimagesets,verbs=get;list;watch;create;update;patch;delete
@@ -120,7 +120,7 @@ func (r *NodeImageSetReconciler) reconcileNodeImageSet(ctx context.Context, node
 	}
 
 	for _, image := range pendingImages {
-		task := Task{
+		task := imgmanager.Task{
 			Ref:              image,
 			RegistryPolicy:   nodeImageSet.Spec.RegistryPolicy,
 			NodeImageSetName: nodeImageSet.Name,

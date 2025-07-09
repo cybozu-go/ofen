@@ -99,7 +99,7 @@ var _ = Describe("NodeImageSet Controller", Serial, func() {
 			ch := make(chan event.TypedGenericEvent[*ofenv1.NodeImageSet])
 
 			imagePuller := imgmanager.NewImagePuller(ctrl.Log.WithName("test-imagepuller"), fakeContainerdClient)
-			queue := workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[Task]())
+			queue := workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[imgmanager.Task]())
 
 			reconciler := &NodeImageSetReconciler{
 				Client:           mgr.GetClient(),

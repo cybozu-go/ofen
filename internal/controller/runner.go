@@ -18,18 +18,11 @@ type Runner struct {
 	client      client.Client
 	ImagePuller *imgmanager.ImagePuller
 	logger      logr.Logger
-	queue       workqueue.TypedRateLimitingInterface[Task]
+	queue       workqueue.TypedRateLimitingInterface[imgmanager.Task]
 	recorder    record.EventRecorder
 }
 
-type Task struct {
-	Ref              string
-	RegistryPolicy   ofenv1.RegistryPolicy
-	NodeImageSetName string
-	Secrets          *[]corev1.Secret
-}
-
-func NewRunner(k8sClient client.Client, imagePuller *imgmanager.ImagePuller, logger logr.Logger, queue workqueue.TypedRateLimitingInterface[Task], recorder record.EventRecorder) *Runner {
+func NewRunner(k8sClient client.Client, imagePuller *imgmanager.ImagePuller, logger logr.Logger, queue workqueue.TypedRateLimitingInterface[imgmanager.Task], recorder record.EventRecorder) *Runner {
 	return &Runner{
 		client:      k8sClient,
 		ImagePuller: imagePuller,
@@ -74,7 +67,7 @@ func (r *Runner) runWorker(ctx context.Context) {
 	}
 }
 
-func (r *Runner) processTask(ctx context.Context, task Task) error {
+func (r *Runner) processTask(ctx context.Context, task imgmanager.Task) error {
 	r.logger.Info("processing image", "task", task)
 
 	var nodeImageSet ofenv1.NodeImageSet

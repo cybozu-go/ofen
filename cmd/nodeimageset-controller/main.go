@@ -121,7 +121,7 @@ func main() {
 	containerdClient := imgmanager.NewContainerd(&containerdConfig, client)
 	imagePuller := imgmanager.NewImagePuller(ctrl.Log.WithName("imagePuller"), containerdClient)
 	ch := make(chan event.TypedGenericEvent[*ofenv1.NodeImageSet])
-	rateLimiter := workqueue.DefaultTypedControllerRateLimiter[controller.Task]()
+	rateLimiter := workqueue.DefaultTypedControllerRateLimiter[imgmanager.Task]()
 	queue := workqueue.NewTypedRateLimitingQueue(rateLimiter)
 
 	runner := controller.NewRunner(
