@@ -1,0 +1,23 @@
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: "imageprefetch-validation.cybozu.io"
+spec:
+  policyName: "imageprefetch-validation.cybozu.io"
+  validationActions: [Deny]
+  paramRef:
+    name: "ofen-registry-allowlist"
+    namespace: "ofen-system"
+    parameterNotFoundAction: Deny
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: "nodeimageset-validation.cybozu.io"
+spec:
+  policyName: "nodeimageset-validation.cybozu.io"
+  validationActions: [Deny]
+  paramRef:
+    name: "ofen-registry-allowlist"
+    namespace: "ofen-system"
+    parameterNotFoundAction: Deny
