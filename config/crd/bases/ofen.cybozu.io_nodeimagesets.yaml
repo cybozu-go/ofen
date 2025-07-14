@@ -14,7 +14,22 @@ spec:
     singular: nodeimageset
   scope: Cluster
   versions:
-  - name: v1
+  - additionalPrinterColumns:
+    - format: int32
+      jsonPath: .status.desiredImages
+      name: Desired
+      type: integer
+    - jsonPath: .status.availableImages
+      name: Available
+      type: integer
+    - jsonPath: .status.downloadFailedImages
+      name: Failed
+      type: integer
+    - jsonPath: .spec.nodeName
+      name: Node
+      priority: 1
+      type: string
+    name: v1
     schema:
       openAPIV3Schema:
         description: NodeImageSet is the Schema for the nodeimagesets API
@@ -39,12 +54,6 @@ spec:
           spec:
             description: NodeImageSetSpec defines the desired state of NodeImageSet
             properties:
-              imageDownloadRetryLimit:
-                default: 3
-                description: ImageDownloadRetryLimit specifies the maximum number
-                  of retry attempts for image downloads
-                format: int32
-                type: integer
               imagePullSecrets:
                 description: ImagePullSecrets is a list of secret names that contain
                   credentials for authenticating with container registries
@@ -151,6 +160,24 @@ spec:
                 x-kubernetes-list-map-keys:
                 - type
                 x-kubernetes-list-type: map
+              containerImageStatuses:
+                description: ContainerImageStatuses holds the status of each container
+                  image.
+                items:
+                  properties:
+                    error:
+                      description: Error is the error message for the image download.
+                      type: string
+                    imageRef:
+                      description: ImageRef is the reference of the image.
+                      type: string
+                    lastState:
+                      description: State is the state of the image download.
+                      type: string
+                  required:
+                  - imageRef
+                  type: object
+                type: array
               desiredImages:
                 default: 0
                 description: DesiredImages is the number of images that need to be

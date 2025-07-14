@@ -19,11 +19,6 @@ type NodeImageSetSpec struct {
 	// ImagePullSecrets is a list of secret names that contain credentials for authenticating with container registries
 	// +optional
 	ImagePullSecrets []corev1.LocalObjectReference `json:"imagePullSecrets,omitempty"`
-
-	// ImageDownloadRetryLimit specifies the maximum number of retry attempts for image downloads
-	// +optional
-	// +kubebuilder:default:=3
-	ImageDownloadRetryLimit int32 `json:"imageDownloadRetryLimit,omitempty"`
 }
 
 type RegistryPolicy string
@@ -69,19 +64,46 @@ type NodeImageSetStatus struct {
 	// +optional
 	// +kubebuilder:default:=0
 	DownloadFailedImages int `json:"downloadFailedImages,omitempty"`
+
+	// ContainerImageStatuses holds the status of each container image.
+	// +optional
+	ContainerImageStatuses []ContainerImageStatus `json:"containerImageStatuses,omitempty"`
+}
+
+type ContainerImageStatus struct {
+	// ImageRef is the reference of the image.
+	ImageRef string `json:"imageRef"`
+
+	// Error is the error message for the image download.
+	// +optional
+	Error string `json:"error,omitempty"`
+
+	// State is the state of the image download.
+	// +optional
+	State string `json:"lastState,omitempty"`
 }
 
 const (
-	ConditionImageAvailable        = "ImageAvailable"
-	ConditionImageDownloadComplete = "ImageDownloadComplete"
-	ConditionImageDownloadFailed   = "ImageDownloadFailed"
+	WaitingForImageDownload = "WaitingForImageDownload"
+	ImageDownloaded         = "ImageDownloaded"
+	ImageDownloadInProgress = "ImageDownloadInProgress"
+	ImageDownloadFailed     = "ImageDownloadFailed"
 )
 
+const (
+	ConditionImageAvailable         = "ImageAvailable"
+	ConditionImageDownloadSucceeded = "ImageDownloadSucceeded"
+)
+
+// +genclient
+// +genclient:nonNamespaced
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:scope=Cluster
-// +genclient
-// +genclient:nonNamespaced
+// +kubebuilder:printcolumn:name="Desired",type="integer",JSONPath=".status.desiredImages",format="int32"
+// +kubebuilder:printcolumn:name="Available",type="integer",JSONPath=".status.availableImages"
+// +kubebuilder:printcolumn:name="Failed",type="integer",JSONPath=".status.downloadFailedImages"
+// +kubebuilder:printcolumn:name="Node",type="string",JSONPath=".spec.nodeName",priority=1
 
 // NodeImageSet is the Schema for the nodeimagesets API
 type NodeImageSet struct {

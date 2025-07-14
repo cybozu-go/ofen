@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	ofenv1 "github.com/cybozu-go/ofen/api/v1"
-	"github.com/cybozu-go/ofen/internal/constants"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
@@ -20,6 +18,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/config"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
+
+	ofenv1 "github.com/cybozu-go/ofen/api/v1"
+	"github.com/cybozu-go/ofen/internal/constants"
 )
 
 const (
@@ -104,7 +105,7 @@ func deleteAllNodes(ctx context.Context) {
 	}
 }
 
-var _ = Describe("ImagePrefetch Controller", func() {
+var _ = Describe("ImagePrefetch Controller", Serial, func() {
 	Context("When reconciling a resource", func() {
 		ctx := context.Background()
 		var stopFunc func()
@@ -150,7 +151,7 @@ var _ = Describe("ImagePrefetch Controller", func() {
 			time.Sleep(100 * time.Millisecond)
 		})
 
-		It("should create NodeImageSets according to the number specified in .spec.replicas.", func() {
+		It("should create NodeImageSets according to the number specified in .spec.replicas", func() {
 			By("creating a new ImagePrefetch with replicas")
 			testName := "replica-node-image-set"
 			replicas := 1
@@ -454,9 +455,9 @@ var _ = Describe("ImagePrefetch Controller", func() {
 
 			By("updating nodeImageSet's status to image pull failed")
 			failedCondition := metav1.Condition{
-				Type:               ofenv1.ConditionImageDownloadFailed,
+				Type:               ofenv1.ConditionImageDownloadSucceeded,
 				Reason:             "test",
-				Status:             metav1.ConditionTrue,
+				Status:             metav1.ConditionFalse,
 				LastTransitionTime: metav1.Now(),
 			}
 			Eventually(func(g Gomega) {
@@ -493,15 +494,9 @@ var _ = Describe("ImagePrefetch Controller", func() {
 			}).Should(Succeed())
 
 			By("updating nodeImageSet's status to image available")
-			failedCondition.Status = metav1.ConditionFalse
+			failedCondition.Status = metav1.ConditionTrue
 			imageAvailableCondition := metav1.Condition{
 				Type:               ofenv1.ConditionImageAvailable,
-				Reason:             "test",
-				Status:             metav1.ConditionTrue,
-				LastTransitionTime: metav1.Now(),
-			}
-			imageDownloadCompleteCondition := metav1.Condition{
-				Type:               ofenv1.ConditionImageDownloadComplete,
 				Reason:             "test",
 				Status:             metav1.ConditionTrue,
 				LastTransitionTime: metav1.Now(),
@@ -518,7 +513,7 @@ var _ = Describe("ImagePrefetch Controller", func() {
 
 				for _, nodeImageSet := range nodeImageSets.Items {
 					nodeImageSet.Status.Conditions = []metav1.Condition{
-						failedCondition, imageAvailableCondition, imageDownloadCompleteCondition}
+						failedCondition, imageAvailableCondition}
 					err = k8sClient.Status().Update(ctx, &nodeImageSet)
 					Expect(err).NotTo(HaveOccurred())
 				}

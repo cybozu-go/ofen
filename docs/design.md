@@ -157,7 +157,7 @@ ImagePrefetch Resource
 | ---------------- | ----------------------------- | -------- | ---------------------------------------------------------- |
 | images           | []string                      | true     | List of images to pre-download                             |
 | nodeSelector     | metav1.LabelSelector          | false    | Specify the nodes to which the image should be downloaded  |
-| allNodes         | bool                          | false    | If true, the image will be downloaded to all nodes        |
+| allNodes         | bool                          | false    | If true, the image will be downloaded to all nodes         |
 | replicas         | int                           | false    | Set the number of image download nodes                     |
 | imagePullSecrets | []corev1.LocalObjectReference | false    | Secret used for authentication with the container registry |
 
@@ -174,13 +174,12 @@ spec:
 ```
 
 NodeImageSet Resource
-| Field                   | Type     | Required | Description                                                    |
-| ----------------------- | -------- | -------- | -------------------------------------------------------------- |
-| images                  | []string | true     | Copy of the images specified in ImagePrefetch's `.spec.Images` |
-| registryPolicy          | string   | true     | Registry to use when downloading images                        |
-| imagePullSecrets        | []string | false    | Copy of the ImagePrefetch's `.spec.imagePullSecrets`           |
-| nodeName                | string   | true     | Node to download images to                                     |
-| imageDownloadRetryLimit | int      | false    | Number of retries to download images                           |
+| Field            | Type                          | Required | Description                                                    |
+| ---------------- | ----------------------------- | -------- | -------------------------------------------------------------- |
+| images           | []string                      | true     | Copy of the images specified in ImagePrefetch's `.spec.Images` |
+| registryPolicy   | string                        | true     | Registry to use when downloading images                        |
+| imagePullSecrets | []corev1.LocalObjectReference | false    | Copy of the ImagePrefetch's `.spec.imagePullSecrets`           |
+| nodeName         | string                        | true     | Node to download images to                                     |
 
 ```
 kind: NodeImageSet

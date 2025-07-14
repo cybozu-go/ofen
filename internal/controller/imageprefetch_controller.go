@@ -10,12 +10,15 @@ import (
 	"sort"
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	metav1apply "k8s.io/client-go/applyconfigurations/meta/v1"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
@@ -30,9 +33,6 @@ import (
 	ofenv1apply "github.com/cybozu-go/ofen/internal/applyconfigurations/api/v1"
 	"github.com/cybozu-go/ofen/internal/constants"
 	"github.com/cybozu-go/ofen/internal/util"
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	metav1apply "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
 // ImagePrefetchReconciler reconciles a ImagePrefetch object
@@ -362,7 +362,7 @@ func getNodeImageSetName(imgPrefetch *ofenv1.ImagePrefetch, nodeName string) (st
 		return "", fmt.Errorf("failed to write string to sha1: %w", err)
 	}
 	hash := hex.EncodeToString(hasher.Sum(nil))
-	return fmt.Sprintf("%s-%s-%s", constants.NodeImageSetPrefix, name, hash[:8]), nil
+	return fmt.Sprintf("%s-%s-%s", constants.NodeImageSetNamePrefix, name, hash[:8]), nil
 }
 
 func (r *ImagePrefetchReconciler) updateStatus(ctx context.Context, imgPrefetch *ofenv1.ImagePrefetch, selectedNodes []string) (ctrl.Result, error) {
@@ -470,14 +470,17 @@ func calculateStatus(selectNodes []string, nodeImageSets *ofenv1.NodeImageSetLis
 			continue
 		}
 
+		if nodeImageSet.Status.Conditions == nil {
+			return status
+		}
+
 		if meta.IsStatusConditionTrue(nodeImageSet.Status.Conditions, ofenv1.ConditionImageAvailable) {
 			status.availableNodes++
 		}
-		if meta.IsStatusConditionTrue(nodeImageSet.Status.Conditions, ofenv1.ConditionImageDownloadFailed) {
+		if !meta.IsStatusConditionTrue(nodeImageSet.Status.Conditions, ofenv1.ConditionImageDownloadSucceeded) {
 			status.pullFailedNodes++
 		}
-		if meta.IsStatusConditionTrue(nodeImageSet.Status.Conditions, ofenv1.ConditionImageDownloadComplete) &&
-			!meta.IsStatusConditionTrue(nodeImageSet.Status.Conditions, ofenv1.ConditionImageAvailable) {
+		if !meta.IsStatusConditionTrue(nodeImageSet.Status.Conditions, ofenv1.ConditionImageAvailable) {
 			status.pullingNodes++
 		}
 	}
