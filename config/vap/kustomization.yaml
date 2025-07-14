@@ -1,0 +1,3 @@
+resources:
+  - vap.yaml
+  - vap_binding.yaml
