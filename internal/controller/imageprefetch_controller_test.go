@@ -34,25 +34,20 @@ var testImagesList = []string{"foobar:123", "foobar:456"}
 func prepareObjects(ctx context.Context) error {
 	// create 4 nodes with labels
 	for i := 0; i < 4; i++ {
-		node := &corev1.Node{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: fmt.Sprintf("%s-%d", nodePrefix, i),
-				Labels: map[string]string{
-					"kubernetes.io/hostname":      fmt.Sprintf("%s-%d", nodePrefix, i),
-					"topology.kubernetes.io/zone": "rack0",
-					"beta.kubernetes.io/arch":     "amd64",
+		node := createNode(fmt.Sprintf("%s-%d", nodePrefix, i)).
+			WithLabels(map[string]string{
+				"topology.kubernetes.io/zone": "rack0",
+			}).
+			WithConditions([]corev1.NodeCondition{
+				{
+					Type:   corev1.NodeReady,
+					Status: corev1.ConditionTrue,
 				},
-			},
-			Status: corev1.NodeStatus{
-				Conditions: []corev1.NodeCondition{
-					{
-						Type:   corev1.NodeReady,
-						Status: corev1.ConditionTrue,
-					},
-				},
-				Images: []corev1.ContainerImage{},
-			},
-		}
+			}).
+			WithImages([]string{
+				"pause:test",
+			}).
+			build()
 
 		_, err := ctrl.CreateOrUpdate(ctx, k8sClient, node, func() error {
 			return nil
@@ -64,32 +59,27 @@ func prepareObjects(ctx context.Context) error {
 
 	// create 3 nodes with labels
 	for i := 4; i < 7; i++ {
-		node := &corev1.Node{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: fmt.Sprintf("%s-%d", nodePrefix, i),
-				Labels: map[string]string{
-					"kubernetes.io/hostname":      fmt.Sprintf("%s-%d", nodePrefix, i),
-					"topology.kubernetes.io/zone": "rack1",
-					"beta.kubernetes.io/arch":     "amd64",
+		node := createNode(fmt.Sprintf("%s-%d", nodePrefix, i)).
+			WithLabels(map[string]string{
+				"topology.kubernetes.io/zone": "rack1",
+			}).
+			WithConditions([]corev1.NodeCondition{
+				{
+					Type:   corev1.NodeReady,
+					Status: corev1.ConditionTrue,
 				},
-			},
-			Status: corev1.NodeStatus{
-				Conditions: []corev1.NodeCondition{
-					{
-						Type:   corev1.NodeReady,
-						Status: corev1.ConditionTrue,
-					},
-				},
-				Images: []corev1.ContainerImage{},
-			},
-		}
+			}).
+			WithImages([]string{
+				"pause:test",
+			}).
+			build()
+
 		_, err := ctrl.CreateOrUpdate(ctx, k8sClient, node, func() error {
 			return nil
 		})
 		if err != nil {
 			return err
 		}
-
 	}
 
 	return nil
@@ -707,8 +697,20 @@ var _ = Describe("ImagePrefetch Controller", Serial, func() {
 			}).Should(Succeed())
 
 			By("adding a new node")
-			newNodeName := fmt.Sprintf("%s-7", nodePrefix)
-			createNewNode(ctx, newNodeName, "rack1")
+			createNodeName := fmt.Sprintf("%s-7", nodePrefix)
+			node := createNode(createNodeName).
+				WithLabels(map[string]string{
+					"topology.kubernetes.io/zone": "rack1",
+				}).
+				WithConditions([]corev1.NodeCondition{
+					{
+						Type:   corev1.NodeReady,
+						Status: corev1.ConditionTrue,
+					},
+				}).
+				build()
+			err := k8sClient.Create(ctx, node)
+			Expect(err).NotTo(HaveOccurred())
 
 			By("checking the number of NodeImageSets is increased")
 			Eventually(func(g Gomega) {
@@ -723,9 +725,6 @@ var _ = Describe("ImagePrefetch Controller", Serial, func() {
 			}).Should(Succeed())
 
 			By("removing a node")
-			node := &corev1.Node{}
-			err := k8sClient.Get(ctx, client.ObjectKey{Name: newNodeName}, node)
-			Expect(err).NotTo(HaveOccurred())
 			err = k8sClient.Delete(ctx, node)
 			Expect(err).NotTo(HaveOccurred())
 
@@ -816,11 +815,20 @@ var _ = Describe("ImagePrefetch Controller", Serial, func() {
 		It("should not include not ready node when one node is NotReady", func() {
 			By("creating a node in NotReady state")
 			notReadyNodeName := fmt.Sprintf("%s-8", nodePrefix)
-			createNewNode(ctx, notReadyNodeName, "rack0")
-
-			node := &corev1.Node{}
-			err := k8sClient.Get(ctx, client.ObjectKey{Name: notReadyNodeName}, node)
+			node := createNode(notReadyNodeName).
+				WithLabels(map[string]string{
+					"topology.kubernetes.io/zone": "rack0",
+				}).
+				WithConditions([]corev1.NodeCondition{
+					{
+						Type:   corev1.NodeReady,
+						Status: corev1.ConditionTrue,
+					},
+				}).
+				build()
+			err := k8sClient.Create(ctx, node)
 			Expect(err).NotTo(HaveOccurred())
+
 			node.Status.Conditions = []corev1.NodeCondition{
 				{
 					Type:   corev1.NodeReady,
@@ -869,31 +877,174 @@ var _ = Describe("ImagePrefetch Controller", Serial, func() {
 			By("cleaning up the new node")
 			deleteAllNodes(ctx)
 		})
-	})
-})
 
-func createNewNode(ctx context.Context, name, zoneName string) {
-	node := &corev1.Node{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: name,
-			Labels: map[string]string{
-				"kubernetes.io/hostname":      name,
-				"topology.kubernetes.io/zone": zoneName,
-				"beta.kubernetes.io/arch":     "amd64",
-			},
-		},
-		Status: corev1.NodeStatus{
-			Conditions: []corev1.NodeCondition{
+		It("should create NodeImageSet when a NotReady node becomes Ready", func() {
+			By("creating ImagePrefetch with nodeSelector and allNodes")
+			testName := "not-ready-to-ready-node"
+			nodeSelector := metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"topology.kubernetes.io/zone": "rack0",
+				},
+			}
+			createNamespace(ctx, testName)
+			imagePrefetch := createNewImagePrefetch(ctx, testName,
+				ofenv1.ImagePrefetchSpec{
+					Images:       testImagesList,
+					NodeSelector: nodeSelector,
+					AllNodes:     true,
+				},
+			)
+
+			By("updating nodeImageSet's status to image available")
+			imageAvailableCondition := metav1.Condition{
+				Type:               ofenv1.ConditionImageAvailable,
+				Reason:             "test",
+				Status:             metav1.ConditionTrue,
+				LastTransitionTime: metav1.Now(),
+			}
+			imageDownloadCompleteCondition := metav1.Condition{
+				Type:               ofenv1.ConditionImageDownloadComplete,
+				Reason:             "test",
+				Status:             metav1.ConditionTrue,
+				LastTransitionTime: metav1.Now(),
+			}
+
+			Eventually(func(g Gomega) {
+				nodeImageSets := &ofenv1.NodeImageSetList{}
+				err := k8sClient.List(ctx, nodeImageSets, &client.ListOptions{
+					LabelSelector: labels.SelectorFromSet(map[string]string{
+						constants.OwnerImagePrefetchNamespace: testName,
+					}),
+				})
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(nodeImageSets.Items).To(HaveLen(4)) // 4 nodes in rack0
+				for _, nodeImageSet := range nodeImageSets.Items {
+					nodeImageSet.Status.Conditions = []metav1.Condition{
+						imageAvailableCondition, imageDownloadCompleteCondition}
+					err = k8sClient.Status().Update(ctx, &nodeImageSet)
+					g.Expect(err).NotTo(HaveOccurred())
+				}
+			}).Should(Succeed())
+
+			By("creating a new node in NotReady state")
+			node := createNode(fmt.Sprintf("%s-9", nodePrefix)).
+				WithLabels(map[string]string{
+					"topology.kubernetes.io/zone": "rack0",
+				}).
+				WithConditions([]corev1.NodeCondition{
+					{
+						Type:   corev1.NodeReady,
+						Status: corev1.ConditionFalse,
+					},
+				}).
+				build()
+			err := k8sClient.Create(ctx, node)
+			Expect(err).NotTo(HaveOccurred())
+
+			By("checking that NotReady node is not included in NodeImageSets")
+			Eventually(func(g Gomega) {
+				nodeImageSets := &ofenv1.NodeImageSetList{}
+				err := k8sClient.List(ctx, nodeImageSets, &client.ListOptions{
+					LabelSelector: labels.SelectorFromSet(map[string]string{
+						constants.OwnerImagePrefetchNamespace: testName,
+					}),
+				})
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(nodeImageSets.Items).To(HaveLen(4))
+
+				imagePrefetch := &ofenv1.ImagePrefetch{}
+				err = k8sClient.Get(ctx, client.ObjectKey{Name: testName, Namespace: testName}, imagePrefetch)
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(imagePrefetch.Status.DesiredNodes).To(Equal(4))
+				g.Expect(imagePrefetch.Status.ImagePulledNodes).To(Equal(4))
+				for _, targetNode := range imagePrefetch.Status.SelectedNodes {
+					g.Expect(targetNode).NotTo(Equal(node.Name))
+				}
+			}).Should(Succeed())
+
+			By("updating the NotReady node to Ready")
+			node.Status.Conditions = []corev1.NodeCondition{
 				{
 					Type:   corev1.NodeReady,
 					Status: corev1.ConditionTrue,
 				},
+			}
+			err = k8sClient.Status().Update(ctx, node)
+			Expect(err).NotTo(HaveOccurred())
+
+			By("checking that NodeImageSet is created for the Ready node")
+			Eventually(func(g Gomega) {
+				nodeImageSets := &ofenv1.NodeImageSetList{}
+				err := k8sClient.List(ctx, nodeImageSets, &client.ListOptions{
+					LabelSelector: labels.SelectorFromSet(map[string]string{
+						constants.OwnerImagePrefetchNamespace: testName,
+					}),
+				})
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(nodeImageSets.Items).To(HaveLen(5)) // 4 + 1 for the new Ready node
+
+				found := false
+				for _, nodeImageSet := range nodeImageSets.Items {
+					if nodeImageSet.Spec.NodeName == node.Name {
+						found = true
+						break
+					}
+				}
+				g.Expect(found).To(BeTrue())
+			}).Should(Succeed())
+
+			By("cleaning up the ImagePrefetch resource")
+			deleteImagePrefetchResource(ctx, imagePrefetch)
+			By("cleaning up the new node")
+			deleteAllNodes(ctx)
+		})
+
+	})
+})
+
+type nodeBuilder struct {
+	object *corev1.Node
+}
+
+func createNode(name string) *nodeBuilder {
+	return &nodeBuilder{
+		object: &corev1.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: name,
+				Labels: map[string]string{
+					"kubernetes.io/hostname": name,
+				},
 			},
-			Images: []corev1.ContainerImage{},
 		},
 	}
-	err := k8sClient.Create(ctx, node)
-	Expect(err).NotTo(HaveOccurred())
+}
+
+func (b *nodeBuilder) WithLabels(labels map[string]string) *nodeBuilder {
+	if b.object.Labels == nil {
+		b.object.Labels = make(map[string]string)
+	}
+	for k, v := range labels {
+		b.object.Labels[k] = v
+	}
+	return b
+}
+
+func (b *nodeBuilder) WithConditions(conditions []corev1.NodeCondition) *nodeBuilder {
+	b.object.Status.Conditions = conditions
+	return b
+}
+
+func (b *nodeBuilder) WithImages(images []string) *nodeBuilder {
+	for _, image := range images {
+		b.object.Status.Images = append(b.object.Status.Images, corev1.ContainerImage{
+			Names: []string{image},
+		})
+	}
+	return b
+}
+
+func (b *nodeBuilder) build() *corev1.Node {
+	return b.object
 }
 
 func createNamespace(ctx context.Context, name string) {
