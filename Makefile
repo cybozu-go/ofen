@@ -58,8 +58,9 @@ vet: ## Run go vet against code.
 	go vet ./...
 
 .PHONY: test
-test: manifests generate fmt vet envtest ginkgo ## Run tests.
+test: manifests generate fmt vet envtest ginkgo kaptest ## Run tests.
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" $(GINKGO) run --skip-file e2e.* -r --coverprofile cover.out -v
+	$(KAPTEST) run config/vap/vap.test/kaptest.yaml
 
 # Utilize Kind or modify the e2e tests to load the image locally, enabling compatibility with other vendors.
 .PHONY: test-e2e  # Run the e2e tests against a Kind k8s instance that is spun up.
@@ -136,6 +137,7 @@ GOLANGCI_LINT = $(LOCALBIN)/golangci-lint
 GINKGO = $(LOCALBIN)/ginkgo
 APPLYCONFIGURATION_GEN = $(LOCALBIN)/applyconfiguration-gen
 MODELS_SCHEMA = $(LOCALBIN)/models-schema
+KAPTEST ?= $(LOCALBIN)/kaptest
 
 ## Tool Versions
 KUSTOMIZE_VERSION ?= v5.6.0
@@ -145,6 +147,7 @@ GOLANGCI_LINT_VERSION ?= v2.1.6
 GINKGO_VERSION ?= v2.23.4
 CODE_GENERATOR_VERSION ?= v0.31.1
 MODELS_SCHEMA_VERSION ?= v1.31.1
+KAPTEST_VERSION ?= v0.1.2
 
 .PHONY: kustomize
 kustomize: $(KUSTOMIZE) ## Download kustomize locally if necessary.
@@ -185,6 +188,13 @@ models-schema: $(LOCALBIN) ## Download models-schema locally if necessary.
 applyconfiguration-gen: $(APPLYCONFIGURATION_GEN) ## Download applyconfiguration-gen locally if necessary.
 $(APPLYCONFIGURATION_GEN): $(LOCALBIN)
 	$(call go-install-tool,$(APPLYCONFIGURATION_GEN),k8s.io/code-generator/cmd/applyconfiguration-gen,$(CODE_GENERATOR_VERSION))
+
+.PHONY: kaptest
+kaptest: $(KAPTEST) ## Download kaptest locally if necessary.
+$(KAPTEST): $(LOCALBIN)
+	curl -sLO "https://github.com/pfnet/kaptest/releases/download/${KAPTEST_VERSION}/kaptest_Linux_x86_64.tar.gz" && \
+	tar -xzf kaptest_Linux_x86_64.tar.gz -C $(LOCALBIN) kaptest && \
+	rm -f kaptest_Linux_x86_64.tar.gz
 
 # go-install-tool will 'go install' any package with custom target and name of binary, if it doesn't exist
 # $1 - target path with name of binary
