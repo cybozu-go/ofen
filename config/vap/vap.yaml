@@ -1,0 +1,78 @@
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: "imageprefetch-validation.cybozu.io"
+spec:
+  failurePolicy: Fail
+  paramKind:
+    apiVersion: "v1"
+    kind: ConfigMap
+  matchConstraints:
+    resourceRules:
+    - apiGroups:   ["ofen.cybozu.io"]
+      apiVersions: ["v1"]
+      operations:  ["CREATE", "UPDATE"]
+      resources:   ["imageprefetches"]
+  validations:
+    - expression: |
+        object.spec.images.size() > 0
+      message: "spec.images must not be empty"
+    - expression: |
+        !(has(object.spec.allNodes) && object.spec.allNodes) || !has(object.spec.replicas)
+      message: "spec.replicas cannot be set when spec.allNodes is true"
+    - expression: |
+        (has(object.spec.allNodes) && object.spec.allNodes) || (has(object.spec.replicas) && object.spec.replicas > 0)
+      message: "spec.replicas must be greater than 0 when spec.allNodes is false"
+    - expression: |
+        !has(object.spec.replicas) || object.spec.replicas >= 0
+      message: "spec.replicas must be a non-negative number"
+    - expression: |
+        !has(object.spec.imagePullSecrets) || 
+        (
+          has(object.spec.imagePullSecrets) && 
+          size(object.spec.imagePullSecrets) > 0 && 
+          object.spec.imagePullSecrets.all(s, has(s.name) && s.name != '')
+        )
+      message: "spec.imagePullSecrets must be a list of non-empty names"
+    - expression: |
+        object.spec.images.all(img, params.data.exists(registry, img.startsWith(params.data[registry])))
+      message: "spec.images must start with one of the permitted registries"
+    - expression: |
+        !has(object.spec.nodeSelector) ||
+        (
+          has(object.spec.nodeSelector) &&
+          object.spec.nodeSelector.all(k, k != '' && object.spec.nodeSelector[k] != '')
+        )
+      message: "spec.nodeSelector must be a map with non-empty keys and values"
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: "nodeimageset-validation.cybozu.io"
+spec:
+  failurePolicy: Fail
+  paramKind:
+    apiVersion: "v1"
+    kind: ConfigMap
+  matchConstraints:
+    resourceRules:
+    - apiGroups:   ["ofen.cybozu.io"]
+      apiVersions: ["v1"]
+      operations:  ["CREATE", "UPDATE"]
+      resources:   ["nodeimagesets"]
+  validations:
+    - expression: |
+        object.spec.images.size() > 0
+      message: "spec.images must not be empty"
+    - expression: |
+        object.spec.images.all(img, params.data.exists(registry, img.startsWith(params.data[registry])))
+      message: "spec.images must start with one of the permitted registries"
+    - expression: |
+        has(object.spec.nodeName) && object.spec.nodeName != ''
+      message: "spec.nodeName must be specified and not empty"
+    - expression: |
+        has(object.spec.registryPolicy) && object.spec.registryPolicy in ['Default', 'MirrorOnly']
+      message: "spec.registryPolicy must be either 'Default' or 'MirrorOnly'"
+    - expression: |
+        !has(object.spec.imagePullSecrets) || (size(object.spec.imagePullSecrets) > 0 && object.spec.imagePullSecrets.all(s, has(s.name) && s.name != ''))
+      message: "spec.imagePullSecrets must be a list of non-empty names"
