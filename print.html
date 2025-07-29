@@ -159,25 +159,12 @@
                         <h1 id="template-documentation"><a class="header" href="#template-documentation">Template documentation</a></h1>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="release-procedure"><a class="header" href="#release-procedure">Release procedure</a></h1>
 <p>This document describes how to release a new version.</p>
+<h2 id="labeling"><a class="header" href="#labeling">Labeling</a></h2>
+<p>Release notes are automatically generated based on PRs included in the release.
+Those PRs are categorized based on the label assigned to them.
+Please refer to <code>.github/release.yml</code> for the kind of labels.</p>
 <h2 id="versioning"><a class="header" href="#versioning">Versioning</a></h2>
 <p>Follow <a href="https://semver.org/spec/v2.0.0.html">semantic versioning 2.0.0</a> to choose the new version number.</p>
-<h2 id="prepare-change-log-entries"><a class="header" href="#prepare-change-log-entries">Prepare change log entries</a></h2>
-<p>Add notable changes since the last release to <a href="CHANGELOG.html">CHANGELOG.md</a>.
-It should look like:</p>
-<pre><code class="language-markdown">(snip)
-## [Unreleased]
-
-### Added
-- Implement ... (#35)
-
-### Changed
-- Fix a bug in ... (#33)
-
-### Removed
-- Deprecated `-option` is removed ... (#39)
-
-(snip)
-</code></pre>
 <h2 id="bump-version"><a class="header" href="#bump-version">Bump version</a></h2>
 <ol>
 <li>
@@ -186,26 +173,6 @@ It should look like:</p>
 $ VERSION=x.y.z
 $ echo $VERSION
 </code></pre>
-</li>
-<li>
-<p>Make a branch to release</p>
-<pre><code class="language-console">$ git checkout main
-$ git pull
-$ git checkout -b "bump-$VERSION"
-</code></pre>
-</li>
-<li>
-<p>Edit <code>CHANGELOG.md</code> for the new version (<a href="https://github.com/cybozu-go/etcdpasswd/commit/77d95384ac6c97e7f48281eaf23cb94f68867f79">example</a>).</p>
-</li>
-<li>
-<p>Commit the change and push it.</p>
-<pre><code class="language-console">$ git commit -a -m "Bump version to $VERSION"
-$ git push -u origin HEAD
-$ gh pr create -f
-</code></pre>
-</li>
-<li>
-<p>Merge this branch.</p>
 </li>
 <li>
 <p>Add a git tag to the main HEAD, then push it.</p>
