@@ -58,7 +58,7 @@ spec:
         - name: host-dir
           hostPath:
             path: /etc/containerd/certs.d
-      serviceAccountName: imageprefetch-controller
+      serviceAccountName: controller-manager
       terminationGracePeriodSeconds: 10
       tolerations:
       - key: node-role.kubernetes.io/control-plane
