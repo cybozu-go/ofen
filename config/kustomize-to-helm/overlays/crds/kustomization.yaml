@@ -1,0 +1,22 @@
+resources:
+  - ../../../crd
+
+patches:
+  - patch: |-
+      - op: add
+        path: /metadata/annotations/helm.sh~1resource-policy
+        value: '{{ .Values.crds.keep | ternary "keep" "delete" }}'
+    target:
+      kind: CustomResourceDefinition
+      name: imageprefetches.ofen.cybozu.io
+  - patch: |-
+      - op: add
+        path: /metadata/annotations/helm.sh~1resource-policy
+        value: '{{ .Values.crds.keep | ternary "keep" "delete" }}'
+    target:
+      kind: CustomResourceDefinition
+      name: nodeimagesets.ofen.cybozu.io
+    
+
+components:
+  - ../../components/common-labels

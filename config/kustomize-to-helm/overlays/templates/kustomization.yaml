@@ -1,0 +1,48 @@
+resources:
+  - ../../../rbac
+  - ../../../vap
+
+namespace: '{{ .Release.Namespace }}'
+namePrefix: '{{ template "ofen.fullname" . }}-'
+
+components:
+  - ../../components/common-labels
+
+patches:
+  - patch: |-
+      $patch: delete
+      apiVersion: v1
+      kind: ConfigMap
+      metadata:
+        name: registry-allowlist
+    target:
+      kind: ConfigMap
+      name: registry-allowlist
+  - patch: |-
+      - op: replace
+        path: /spec/paramRef/namespace
+        value: '{{ .Release.Namespace }}'
+    target:
+      kind: ValidatingAdmissionPolicyBinding
+      name: imageprefetch-validation.cybozu.io
+  - patch: |-
+      - op: replace
+        path: /spec/paramRef/namespace
+        value: '{{ .Release.Namespace }}'
+    target:
+      kind: ValidatingAdmissionPolicyBinding
+      name: nodeimageset-validation.cybozu.io
+  - patch: |-
+      - op: replace
+        path: /spec/paramRef/name
+        value: '{{ template "ofen.fullname" . }}-registry-allowlist'
+    target:
+      kind: ValidatingAdmissionPolicyBinding
+      name: imageprefetch-validation.cybozu.io
+  - patch: |-
+      - op: replace
+        path: /spec/paramRef/name
+        value: '{{ template "ofen.fullname" . }}-registry-allowlist'
+    target:
+      kind: ValidatingAdmissionPolicyBinding
+      name: nodeimageset-validation.cybozu.io
