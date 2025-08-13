@@ -84,10 +84,11 @@ type ContainerImageStatus struct {
 }
 
 const (
-	WaitingForImageDownload = "WaitingForImageDownload"
-	ImageDownloaded         = "ImageDownloaded"
-	ImageDownloadInProgress = "ImageDownloadInProgress"
-	ImageDownloadFailed     = "ImageDownloadFailed"
+	WaitingForImageDownload        = "WaitingForImageDownload"
+	ImageDownloaded                = "ImageDownloaded"
+	ImageDownloadInProgress        = "ImageDownloadInProgress"
+	ImageDownloadFailed            = "ImageDownloadFailed"
+	ImageDownloadTemporarilyFailed = "ImageDownloadTemporarilyFailed"
 )
 
 const (

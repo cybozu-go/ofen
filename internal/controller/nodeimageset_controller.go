@@ -142,12 +142,12 @@ func (r *NodeImageSetReconciler) collectPendingImages(ctx context.Context, nodeI
 
 	var images []string
 	for _, image := range nodeImageSet.Spec.Images {
-		status, _, err := r.ImagePuller.GetImageStatus(ctx, nodeImageSet.Name, image)
+		status, _, err := r.ImagePuller.GetImageStatus(ctx, nodeImageSet.Name, image, nodeImageSet.Spec.RegistryPolicy)
 		if err != nil {
 			log.FromContext(ctx).Error(err, "failed to get image status", "image", image)
 			continue
 		}
-		if status == ofenv1.WaitingForImageDownload || status == ofenv1.ImageDownloadFailed {
+		if status == ofenv1.WaitingForImageDownload {
 			images = append(images, image)
 		}
 	}
@@ -173,7 +173,7 @@ func (r *NodeImageSetReconciler) updateStatus(ctx context.Context, nodeImageSet 
 
 	for _, image := range nodeImageSet.Spec.Images {
 		var errMsg string
-		status, errMsg, err := r.ImagePuller.GetImageStatus(ctx, nodeImageSet.Name, image)
+		status, errMsg, err := r.ImagePuller.GetImageStatus(ctx, nodeImageSet.Name, image, nodeImageSet.Spec.RegistryPolicy)
 		if err != nil {
 			return ctrl.Result{}, fmt.Errorf("failed to get image status for %s: %w", image, err)
 		}
@@ -242,7 +242,7 @@ func (r *NodeImageSetReconciler) calculateImageStatus(ctx context.Context, nis *
 	failed := 0
 
 	for _, image := range nis.Spec.Images {
-		status, _, err := r.ImagePuller.GetImageStatus(ctx, nis.Name, image)
+		status, _, err := r.ImagePuller.GetImageStatus(ctx, nis.Name, image, nis.Spec.RegistryPolicy)
 		if err != nil {
 			log.FromContext(ctx).Error(err, "failed to get image status", "image", image)
 			continue
@@ -252,6 +252,9 @@ func (r *NodeImageSetReconciler) calculateImageStatus(ctx context.Context, nis *
 			downloadedImage++
 		case ofenv1.ImageDownloadFailed:
 			failed++
+		case ofenv1.ImageDownloadTemporarilyFailed:
+			// Do not reflect ImageDownloadTemporarilyFailed in the status.
+			// It's a temporary error that resolves once the image is cached in the registry mirror.
 		case ofenv1.ImageDownloadInProgress:
 		default:
 		}
