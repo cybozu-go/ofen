@@ -23,9 +23,8 @@ spec:
         - name: manager
           image: "{{ .Values.controller.image.repository }}:{{ default .Chart.AppVersion .Values.controller.image.tag }}"
           imagePullPolicy: {{ .Values.controller.image.pullPolicy }}
-          args:
-            - -leader-elect={{ .Values.controller.leaderElection.enabled }}
           {{- with .Values.controller.extraArgs }}
+          args:
             {{- toYaml . | nindent 12 }}
           {{- end }}
           ports:

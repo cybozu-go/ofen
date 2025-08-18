@@ -20,10 +20,6 @@ controller:
     # @default -- `{{ .Chart.AppVersion }}`
     tag:  # 0.1.0
     
-  leaderElection:
-    # controller.leaderElection.enabled -- Enable leader election for the ofen-controller.
-    enabled: true
-  
   # controller.imagePullSecrets -- Secrets for pulling the ofen-controller image from a private repository.
   imagePullSecrets: []
 
