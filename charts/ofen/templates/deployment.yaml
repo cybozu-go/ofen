@@ -5,19 +5,19 @@ metadata:
   namespace: {{ .Release.Namespace }}
   labels:
     app.kubernetes.io/component: controller
-    app.kubernetes.io/name: {{ include "ofen.name" . }}-controller
+    app.kubernetes.io/name: {{ include "ofen.name" . }}
     {{- include "ofen.labels" . | nindent 4 }}
 spec:
   replicas: {{ .Values.controller.replicas }}
   selector:
     matchLabels:
       app.kubernetes.io/component: controller
-      app.kubernetes.io/name: {{ include "ofen.name" . }}-controller
+      app.kubernetes.io/name: {{ include "ofen.name" . }}
   template:
     metadata:
       labels:
         app.kubernetes.io/component: controller
-        app.kubernetes.io/name: {{ include "ofen.name" . }}-controller
+        app.kubernetes.io/name: {{ include "ofen.name" . }}
     spec:
       containers:
         - name: manager
