@@ -31,6 +31,22 @@ controller:
 
   # controller.extraArgs -- Additional command line arguments to pass to the ofen-controller binary.
   extraArgs: []
+  
+  # nodeSelector -- nodeSelector used by ofen-controller.
+  nodeSelector: {}
+  
+  # affinity -- affinity used by ofen-controller.
+  affinity: {}
+  
+  # tolerations -- tolerations used by ofen-controller.
+  tolerations: []
+  
+  # topologySpreadConstraints -- topologySpreadConstraints used by ofen-controller.
+  topologySpreadConstraints: []
+  
+  # priorityClassName -- PriorityClass used by ofen-controller.
+  priorityClassName: ""
+  
 
 daemon:
   image:
