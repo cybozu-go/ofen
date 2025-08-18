@@ -64,6 +64,10 @@ spec:
         runAsUser: 0 # Run as root to mount containerd socket
       serviceAccountName: '{{ template "ofen.fullname" . }}-controller-manager'
       terminationGracePeriodSeconds: 10
+      {{- with .Values.daemon.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       volumes:
         - name: containerd-sock
           hostPath:
