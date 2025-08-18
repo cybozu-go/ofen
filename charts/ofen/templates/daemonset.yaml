@@ -68,6 +68,23 @@ spec:
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      {{- with .Values.daemon.priorityClassName}}
+      priorityClassName: {{ quote . }}
+      {{- end }}
+      {{- with .Values.daemon.nodeSelector }}
+      {{- end }}
+      {{- with .Values.daemon.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.daemon.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.daemon.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       volumes:
         - name: containerd-sock
           hostPath:

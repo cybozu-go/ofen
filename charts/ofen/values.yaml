@@ -77,6 +77,18 @@ daemon:
   
   # daemon.containerdHostDirPath -- Path to the host directory where containerd certificate configurations are stored.
   containerdHostDirPath: /etc/containerd/certs.d
+  
+  # nodeSelector -- nodeSelector used by ofen-daemon.
+  nodeSelector: {}
+  
+  # affinity -- affinity used by ofen-daemon.
+  affinity: {}
+  
+  # tolerations -- tolerations used by ofen-daemon.
+  tolerations: []
+  
+  # priorityClassName -- PriorityClass used by ofen-daemon.
+  priorityClassName: ""
 
 # allowRegistries -- Allow pulling images from some registries.
 allowRegistries: []
