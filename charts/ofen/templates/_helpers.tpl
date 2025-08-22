@@ -35,6 +35,7 @@ Common labels
 */}}
 {{- define "ofen.labels" -}}
 helm.sh/chart: {{ include "ofen.chart" . }}
+app.kubernetes.io/name: {{ include "ofen.name" . }}
 {{- if .Chart.AppVersion }}
 app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 {{- end }}
