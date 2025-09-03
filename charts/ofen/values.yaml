@@ -36,7 +36,20 @@ controller:
   nodeSelector: {}
   
   # affinity -- affinity used by ofen-controller.
-  affinity: {}
+  affinity:
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        - labelSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: In
+                values:
+                  - ofen
+              - key: app.kubernetes.io/component
+                operator: In
+                values:
+                  - controller
+          topologyKey: "topology.kubernetes.io/zone"
   
   # tolerations -- tolerations used by ofen-controller.
   tolerations: []
