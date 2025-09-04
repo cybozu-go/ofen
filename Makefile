@@ -21,8 +21,12 @@ help: ## Display this help.
 	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z_0-9-]+:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
 
 .PHONY: manifests
-manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
-	$(CONTROLLER_GEN) rbac:roleName=imageprefetch-controller-role crd paths="./..." output:crd:artifacts:config=config/crd/bases
+manifests: controller-gen kustomize yq ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
+	$(CONTROLLER_GEN) rbac:roleName=controller-manager-role crd paths="./..." output:crd:artifacts:config=config/crd/bases
+	echo '{{- if .Values.crds.enabled }}' > charts/ofen/templates/generated/crds/crds.yaml	
+	$(KUSTOMIZE) build config/kustomize-to-helm/overlays/crds | $(YQ) e "." - >> charts/ofen/templates/generated/crds/crds.yaml
+	echo '{{- end }}' >> charts/ofen/templates/generated/crds/crds.yaml
+	kustomize build config/kustomize-to-helm/overlays/templates | yq e "."  -p yaml - > charts/ofen/templates/generated/generated.yaml
 
 .PHONY: generate
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
@@ -138,6 +142,7 @@ GINKGO = $(LOCALBIN)/ginkgo
 APPLYCONFIGURATION_GEN = $(LOCALBIN)/applyconfiguration-gen
 MODELS_SCHEMA = $(LOCALBIN)/models-schema
 KAPTEST ?= $(LOCALBIN)/kaptest
+YQ ?= $(LOCALBIN)/yq
 
 ## Tool Versions
 KUSTOMIZE_VERSION ?= v5.6.0
@@ -148,6 +153,7 @@ GINKGO_VERSION ?= v2.23.4
 CODE_GENERATOR_VERSION ?= v0.31.1
 MODELS_SCHEMA_VERSION ?= v1.31.1
 KAPTEST_VERSION ?= v0.1.2
+YQ_VERSION ?= v4.47.1
 
 .PHONY: kustomize
 kustomize: $(KUSTOMIZE) ## Download kustomize locally if necessary.
@@ -195,6 +201,15 @@ $(KAPTEST): $(LOCALBIN)
 	curl -sLO "https://github.com/pfnet/kaptest/releases/download/${KAPTEST_VERSION}/kaptest_Linux_x86_64.tar.gz" && \
 	tar -xzf kaptest_Linux_x86_64.tar.gz -C $(LOCALBIN) kaptest && \
 	rm -f kaptest_Linux_x86_64.tar.gz
+
+.PHONY: yq
+yq: $(YQ) ## Download yq locally if necessary.
+$(YQ): $(LOCALBIN)
+	curl -sLO "https://github.com/mikefarah/yq/releases/download/$(YQ_VERSION)/yq_linux_amd64.tar.gz" && \
+	tar -xzf yq_linux_amd64.tar.gz ./yq_linux_amd64 && \
+	mv yq_linux_amd64 $(YQ) && \
+	chmod +x $(YQ) && \
+	rm -f yq_linux_amd64.tar.gz
 
 # go-install-tool will 'go install' any package with custom target and name of binary, if it doesn't exist
 # $1 - target path with name of binary

@@ -1,0 +1,107 @@
+crds:
+  # crds.enabled -- Install and update CRDs as part of the Helm chart.
+  enabled: true
+ 
+  # crds.keep -- Keep existing CRDs during uninstallation.
+  keep: true
+
+controller:
+  # controller.replicas -- Number of replicas for the ofen-controller Deployment.
+  replicas: 2
+
+  image:
+    # controller.image.repository -- ofen-controller image repository to use.
+    repository: ghcr.io/cybozu-go/ofen
+  
+    # controller.image.pullPolicy -- ofen-controller image pull policy.
+    pullPolicy: IfNotPresent
+  
+    # controller.image.tag -- ofen-controller image tag to use.
+    # @default -- `{{ .Chart.AppVersion }}`
+    tag:  # 0.1.0
+    
+  # controller.imagePullSecrets -- Secrets for pulling the ofen-controller image from a private repository.
+  imagePullSecrets: []
+
+  # controller.resources -- Resource requests and limits for the ofen-controller Deployment.
+  resources:
+    requests:
+      cpu: 100m
+      memory: 20Mi
+
+  # controller.extraArgs -- Additional command line arguments to pass to the ofen-controller binary.
+  extraArgs: []
+  
+  # nodeSelector -- nodeSelector used by ofen-controller.
+  nodeSelector: {}
+  
+  # affinity -- affinity used by ofen-controller.
+  affinity:
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        - labelSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: In
+                values:
+                  - ofen
+              - key: app.kubernetes.io/component
+                operator: In
+                values:
+                  - controller
+          topologyKey: "topology.kubernetes.io/zone"
+  
+  # tolerations -- tolerations used by ofen-controller.
+  tolerations: []
+  
+  # topologySpreadConstraints -- topologySpreadConstraints used by ofen-controller.
+  topologySpreadConstraints: []
+  
+  # priorityClassName -- PriorityClass used by ofen-controller.
+  priorityClassName: ""
+  
+
+daemon:
+  image:
+    # daemon.image.repository -- ofen-daemon image repository to use.
+    repository: ghcr.io/cybozu-go/ofend
+  
+    # daemon.image.pullPolicy -- ofen-daemon image pull policy.
+    pullPolicy: IfNotPresent
+  
+    # daemon.image.tag -- ofen-daemon image tag to use.
+    # @default -- `{{ .Chart.AppVersion }}`
+    tag:  # 0.1.0
+
+  # daemon.imagePullSecrets -- Secrets for pulling the ofen-daemon image from a private repository.
+  imagePullSecrets: []
+
+  # daemon.resources -- Resource requests and limits for the ofen-daemon DaemonSet.
+  resources:
+    requests:
+      cpu: 100m
+      memory: 20Mi
+
+  # daemon.extraArgs -- Additional command line arguments to pass to the ofen-daemon binary.
+  extraArgs: []
+ 
+  # daemon.containerdSockPath -- Path to the containerd socket.
+  containerdSockPath: /run/containerd/containerd.sock
+  
+  # daemon.containerdHostDirPath -- Path to the host directory where containerd certificate configurations are stored.
+  containerdHostDirPath: /etc/containerd/certs.d
+  
+  # nodeSelector -- nodeSelector used by ofen-daemon.
+  nodeSelector: {}
+  
+  # affinity -- affinity used by ofen-daemon.
+  affinity: {}
+  
+  # tolerations -- tolerations used by ofen-daemon.
+  tolerations: []
+  
+  # priorityClassName -- PriorityClass used by ofen-daemon.
+  priorityClassName: ""
+
+# allowRegistries -- Allow pulling images from some registries.
+allowRegistries: []
