@@ -60,7 +60,9 @@ spec:
             - name: containerd-host-dir
               mountPath: {{ .Values.daemon.containerdHostDirPath }}
       securityContext:
-        runAsUser: 0 # Run as root to mount containerd socket
+        capabilities:
+          drop:
+            - ALL
       serviceAccountName: '{{ template "ofen.fullname" . }}-controller-manager'
       terminationGracePeriodSeconds: 10
       {{- with .Values.daemon.imagePullSecrets }}
