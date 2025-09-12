@@ -29,26 +29,35 @@ $ helm install --create-namespace --namespace ofen-system ofen -f values.yaml of
 
 ## Values
 
-| Key                          | Type   | Default                                       | Description                                                                        |
-| ---------------------------- | ------ | --------------------------------------------- | ---------------------------------------------------------------------------------- |
-| crds.enabled                 | bool   | `true`                                        | Install and update CRDs as part of the Helm chart.                                 |
-| crds.keep                    | bool   | `true`                                        | Keep existing CRDs during uninstallation.                                          |
-| controller.replicas          | int    | `2`                                           | Number of replicas for the ofen-controller Deployment.                             |
-| controller.image.repository  | string | `"ghcr.io/cybozu-go/ofen"`                    | ofen-controller image repository to use.                                           |
-| controller.image.pullPolicy  | string | `"IfNotPresent"`                              | ofen-controller image pull policy.                                                 |
-| controller.image.tag         | string | `""`                                          | ofen-controller image tag to use.                                                  |
-| controller.imagePullSecrets  | list   | `[]`                                          | Secrets for pulling the ofen-controller image from a private repository.           |
-| controller.resources         | object | `{"requests":{"cpu":"100m","memory":"20Mi"}}` | Resource requests and limits for the ofen-controller Deployment.                   |
-| controller.extraArgs         | list   | `[]`                                          | Additional command line arguments to pass to the ofen-controller binary.           |
-| daemon.image.repository      | string | `"ghcr.io/cybozu-go/ofend"`                   | ofen-daemon image repository to use.                                               |
-| daemon.image.pullPolicy      | string | `"IfNotPresent"`                              | ofen-daemon image pull policy.                                                     |
-| daemon.image.tag             | string | `""`                                          | ofen-daemon image tag to use.                                                      |
-| daemon.imagePullSecrets      | list   | `[]`                                          | Secrets for pulling the ofen-daemon image from a private repository.               |
-| daemon.resources             | object | `{"requests":{"cpu":"100m","memory":"20Mi"}}` | Resource requests and limits for the ofen-daemon DaemonSet.                        |
-| daemon.extraArgs             | list   | `[]`                                          | Additional command line arguments to pass to the ofen-daemon binary.               |
-| daemon.containerdSockPath    | string | `"/run/containerd/containerd.sock"`           | Path to the containerd socket.                                                     |
-| daemon.containerdHostDirPath | string | `"/etc/containerd/certs.d"`                   | Path to the host directory where containerd certificate configurations are stored. |
-| allowRegistries              | list   | `[]`                                          | Allow pulling images from some registries.                                         |
+| Key                                  | Type   | Default                                       | Description                                                                        |
+| ------------------------------------ | ------ | --------------------------------------------- | ---------------------------------------------------------------------------------- |
+| crds.enabled                         | bool   | `true`                                        | Install and update CRDs as part of the Helm chart.                                 |
+| crds.keep                            | bool   | `true`                                        | Keep CRDs when uninstalling the chart.                                             |
+| controller.replicas                  | int    | `2`                                           | Number of replicas for the ofen-controller Deployment.                             |
+| controller.image.repository          | string | `"ghcr.io/cybozu-go/ofen"`                    | The ofen-controller image repository to use.                                       |
+| controller.image.pullPolicy          | string | `"IfNotPresent"`                              | The ofen-controller image pull policy.                                             |
+| controller.image.tag                 | string | `""`                                          | The ofen-controller image tag to use.                                              |
+| controller.imagePullSecrets          | list   | `[]`                                          | Secrets for pulling the ofen-controller image from a private repository.           |
+| controller.resources                 | object | `{"requests":{"cpu":"100m","memory":"20Mi"}}` | Resource requests and limits for the ofen-controller Deployment.                   |
+| controller.extraArgs                 | list   | `[]`                                          | Additional command line arguments to pass to the ofen-controller binary.           |
+| controller.nodeSelector              | object | `{}`                                          | NodeSelector used by the ofen-controller.                                          |
+| controller.affinity                  | object | `{}`                                          | Affinity used by the ofen-controller.                                              |
+| controller.tolerations               | list   | `[]`                                          | Tolerations used by the ofen-controller.                                           |
+| controller.topologySpreadConstraints | list   | `[]`                                          | Topology spread constraints used by the ofen-controller.                           |
+| controller.priorityClassName         | string | `""`                                          | PriorityClass used by the ofen-controller.                                         |
+| daemon.image.repository              | string | `"ghcr.io/cybozu-go/ofend"`                   | The ofen-daemon image repository to use.                                           |
+| daemon.image.pullPolicy              | string | `"IfNotPresent"`                              | The ofen-daemon image pull policy.                                                 |
+| daemon.image.tag                     | string | `""`                                          | The ofen-daemon image tag to use.                                                  |
+| daemon.imagePullSecrets              | list   | `[]`                                          | Secrets for pulling the ofen-daemon image from a private repository.               |
+| daemon.resources                     | object | `{"requests":{"cpu":"100m","memory":"20Mi"}}` | Resource requests and limits for the ofen-daemon DaemonSet.                        |
+| daemon.extraArgs                     | list   | `[]`                                          | Additional command line arguments to pass to the ofen-daemon binary.               |
+| daemon.containerdSockPath            | string | `"/run/containerd/containerd.sock"`           | Path to the containerd socket.                                                     |
+| daemon.containerdHostDirPath         | string | `"/etc/containerd/certs.d"`                   | Path to the host directory where containerd certificate configurations are stored. |
+| daemon.nodeSelector                  | object | `{}`                                          | Node labels for scheduling the ofen-daemon.                                        |
+| daemon.affinity                      | object | `{}`                                          | Affinity used by the ofen-daemon.                                                  |
+| daemon.tolerations                   | list   | `[]`                                          | Tolerations used by the ofen-daemon.                                               |
+| daemon.priorityClassName             | string | `""`                                          | PriorityClass used by the ofen-daemon.                                             |
+| allowRegistries                      | list   | `[]`                                          | Allow pulling images from specified registries.                                    |
 
 ## Generate Manifests
 

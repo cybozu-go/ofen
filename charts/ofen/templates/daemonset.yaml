@@ -91,6 +91,3 @@ spec:
         - name: containerd-host-dir
           hostPath:
             path: {{ .Values.daemon.containerdHostDirPath }}
-      tolerations:
-        - key: node-role.kubernetes.io/control-plane
-          effect: NoSchedule
