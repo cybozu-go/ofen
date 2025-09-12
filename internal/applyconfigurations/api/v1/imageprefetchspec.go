@@ -4,17 +4,17 @@ package v1
 
 import (
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
+	metav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
 // ImagePrefetchSpecApplyConfiguration represents a declarative configuration of the ImagePrefetchSpec type for use
 // with apply.
 type ImagePrefetchSpecApplyConfiguration struct {
-	Images           []string                            `json:"images,omitempty"`
-	NodeSelector     *v1.LabelSelectorApplyConfiguration `json:"nodeSelector,omitempty"`
-	AllNodes         *bool                               `json:"allNodes,omitempty"`
-	Replicas         *int                                `json:"replicas,omitempty"`
-	ImagePullSecrets []corev1.LocalObjectReference       `json:"imagePullSecrets,omitempty"`
+	Images           []string                                `json:"images,omitempty"`
+	NodeSelector     *metav1.LabelSelectorApplyConfiguration `json:"nodeSelector,omitempty"`
+	AllNodes         *bool                                   `json:"allNodes,omitempty"`
+	Replicas         *int                                    `json:"replicas,omitempty"`
+	ImagePullSecrets []corev1.LocalObjectReference           `json:"imagePullSecrets,omitempty"`
 }
 
 // ImagePrefetchSpecApplyConfiguration constructs a declarative configuration of the ImagePrefetchSpec type for use with
@@ -36,7 +36,7 @@ func (b *ImagePrefetchSpecApplyConfiguration) WithImages(values ...string) *Imag
 // WithNodeSelector sets the NodeSelector field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the NodeSelector field is set to the value of the last call.
-func (b *ImagePrefetchSpecApplyConfiguration) WithNodeSelector(value *v1.LabelSelectorApplyConfiguration) *ImagePrefetchSpecApplyConfiguration {
+func (b *ImagePrefetchSpecApplyConfiguration) WithNodeSelector(value *metav1.LabelSelectorApplyConfiguration) *ImagePrefetchSpecApplyConfiguration {
 	b.NodeSelector = value
 	return b
 }

@@ -3,7 +3,7 @@
 package v1
 
 import (
-	v1 "github.com/cybozu-go/ofen/api/v1"
+	apiv1 "github.com/cybozu-go/ofen/api/v1"
 	corev1 "k8s.io/api/core/v1"
 )
 
@@ -11,7 +11,7 @@ import (
 // with apply.
 type NodeImageSetSpecApplyConfiguration struct {
 	Images           []string                      `json:"images,omitempty"`
-	RegistryPolicy   *v1.RegistryPolicy            `json:"registryPolicy,omitempty"`
+	RegistryPolicy   *apiv1.RegistryPolicy         `json:"registryPolicy,omitempty"`
 	NodeName         *string                       `json:"nodeName,omitempty"`
 	ImagePullSecrets []corev1.LocalObjectReference `json:"imagePullSecrets,omitempty"`
 }
@@ -35,7 +35,7 @@ func (b *NodeImageSetSpecApplyConfiguration) WithImages(values ...string) *NodeI
 // WithRegistryPolicy sets the RegistryPolicy field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the RegistryPolicy field is set to the value of the last call.
-func (b *NodeImageSetSpecApplyConfiguration) WithRegistryPolicy(value v1.RegistryPolicy) *NodeImageSetSpecApplyConfiguration {
+func (b *NodeImageSetSpecApplyConfiguration) WithRegistryPolicy(value apiv1.RegistryPolicy) *NodeImageSetSpecApplyConfiguration {
 	b.RegistryPolicy = &value
 	return b
 }
