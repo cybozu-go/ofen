@@ -3,19 +3,19 @@
 package v1
 
 import (
-	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
+	metav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
 // ImagePrefetchStatusApplyConfiguration represents a declarative configuration of the ImagePrefetchStatus type for use
 // with apply.
 type ImagePrefetchStatusApplyConfiguration struct {
-	ObservedGeneration   *int64                           `json:"observedGeneration,omitempty"`
-	Conditions           []v1.ConditionApplyConfiguration `json:"conditions,omitempty"`
-	DesiredNodes         *int                             `json:"desiredNodes,omitempty"`
-	ImagePulledNodes     *int                             `json:"imagePulledNodes,omitempty"`
-	ImagePullingNodes    *int                             `json:"imagePullingNodes,omitempty"`
-	ImagePullFailedNodes *int                             `json:"imagePullFailedNodes,omitempty"`
-	SelectedNodes        []string                         `json:"selectedNodes,omitempty"`
+	ObservedGeneration   *int64                               `json:"observedGeneration,omitempty"`
+	Conditions           []metav1.ConditionApplyConfiguration `json:"conditions,omitempty"`
+	DesiredNodes         *int                                 `json:"desiredNodes,omitempty"`
+	ImagePulledNodes     *int                                 `json:"imagePulledNodes,omitempty"`
+	ImagePullingNodes    *int                                 `json:"imagePullingNodes,omitempty"`
+	ImagePullFailedNodes *int                                 `json:"imagePullFailedNodes,omitempty"`
+	SelectedNodes        []string                             `json:"selectedNodes,omitempty"`
 }
 
 // ImagePrefetchStatusApplyConfiguration constructs a declarative configuration of the ImagePrefetchStatus type for use with
@@ -35,7 +35,7 @@ func (b *ImagePrefetchStatusApplyConfiguration) WithObservedGeneration(value int
 // WithConditions adds the given value to the Conditions field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Conditions field.
-func (b *ImagePrefetchStatusApplyConfiguration) WithConditions(values ...*v1.ConditionApplyConfiguration) *ImagePrefetchStatusApplyConfiguration {
+func (b *ImagePrefetchStatusApplyConfiguration) WithConditions(values ...*metav1.ConditionApplyConfiguration) *ImagePrefetchStatusApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithConditions")

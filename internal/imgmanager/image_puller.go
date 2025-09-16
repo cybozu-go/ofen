@@ -7,8 +7,8 @@ import (
 	"sync"
 
 	eventtypes "github.com/containerd/containerd/api/events"
-	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/v2/core/events"
+	"github.com/containerd/errdefs"
 	"github.com/containerd/typeurl/v2"
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"

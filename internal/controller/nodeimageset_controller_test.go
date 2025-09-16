@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/errdefs"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
