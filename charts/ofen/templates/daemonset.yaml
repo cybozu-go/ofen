@@ -73,8 +73,6 @@ spec:
       priorityClassName: {{ quote . }}
       {{- end }}
       {{- with .Values.daemon.nodeSelector }}
-      {{- end }}
-      {{- with .Values.daemon.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
       {{- end }}
@@ -84,6 +82,10 @@ spec:
       {{- end }}
       {{- with .Values.daemon.tolerations }}
       tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.daemon.topologySpreadConstraints }}
+      topologySpreadConstraints:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       volumes:

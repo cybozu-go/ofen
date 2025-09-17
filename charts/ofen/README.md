@@ -56,6 +56,7 @@ $ helm install --create-namespace --namespace ofen-system ofen -f values.yaml of
 | daemon.nodeSelector                  | object | `{}`                                          | Node labels for scheduling the ofen-daemon.                                        |
 | daemon.affinity                      | object | `{}`                                          | Affinity used by the ofen-daemon.                                                  |
 | daemon.tolerations                   | list   | `[]`                                          | Tolerations used by the ofen-daemon.                                               |
+| daemon.topologySpreadConstraints     | list   | `[]`                                          | Topology spread constraints used by the ofen-daemon.                               |
 | daemon.priorityClassName             | string | `""`                                          | PriorityClass used by the ofen-daemon.                                             |
 | allowRegistries                      | list   | `[]`                                          | Allow pulling images from specified registries.                                    |
 

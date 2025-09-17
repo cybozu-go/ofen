@@ -101,7 +101,10 @@ daemon:
   tolerations:
     - key: node-role.kubernetes.io/control-plane
       effect: NoSchedule
-  
+
+  # topologySpreadConstraints -- topologySpreadConstraints used by ofen-daemon.
+  topologySpreadConstraints: [] 
+
   # priorityClassName -- PriorityClass used by ofen-daemon.
   priorityClassName: ""
 
