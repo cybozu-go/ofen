@@ -60,7 +60,9 @@ spec:
             - name: containerd-host-dir
               mountPath: {{ .Values.daemon.containerdHostDirPath }}
       securityContext:
-        runAsUser: 0 # Run as root to mount containerd socket
+        capabilities:
+          drop:
+            - ALL
       serviceAccountName: '{{ template "ofen.fullname" . }}-controller-manager'
       terminationGracePeriodSeconds: 10
       {{- with .Values.daemon.imagePullSecrets }}
@@ -69,8 +71,6 @@ spec:
       {{- end }}
       {{- with .Values.daemon.priorityClassName}}
       priorityClassName: {{ quote . }}
-      {{- end }}
-      {{- with .Values.daemon.nodeSelector }}
       {{- end }}
       {{- with .Values.daemon.nodeSelector }}
       nodeSelector:
@@ -84,6 +84,10 @@ spec:
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      {{- with .Values.daemon.topologySpreadConstraints }}
+      topologySpreadConstraints:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       volumes:
         - name: containerd-sock
           hostPath:
@@ -91,6 +95,3 @@ spec:
         - name: containerd-host-dir
           hostPath:
             path: {{ .Values.daemon.containerdHostDirPath }}
-      tolerations:
-        - key: node-role.kubernetes.io/control-plane
-          effect: NoSchedule

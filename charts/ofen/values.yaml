@@ -59,7 +59,7 @@ controller:
   
   # priorityClassName -- PriorityClass used by ofen-controller.
   priorityClassName: ""
-  
+
 
 daemon:
   image:
@@ -98,8 +98,13 @@ daemon:
   affinity: {}
   
   # tolerations -- tolerations used by ofen-daemon.
-  tolerations: []
-  
+  tolerations:
+    - key: node-role.kubernetes.io/control-plane
+      effect: NoSchedule
+
+  # topologySpreadConstraints -- topologySpreadConstraints used by ofen-daemon.
+  topologySpreadConstraints: [] 
+
   # priorityClassName -- PriorityClass used by ofen-daemon.
   priorityClassName: ""
 
