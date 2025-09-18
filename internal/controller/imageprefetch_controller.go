@@ -231,7 +231,7 @@ func selectNodesByReplicas(imgPrefetch *ofenv1.ImagePrefetch, readyNodes []corev
 		sort.Slice(candidates, func(i, j int) bool {
 			si := scoreNode(candidates[i], zoneCount)
 			sj := scoreNode(candidates[j], zoneCount)
-			return si > sj
+			return si < sj
 		})
 		selectNodes = append(selectNodes, candidates[0])
 	}
@@ -243,9 +243,6 @@ func getZoneCount(selectedNodes []corev1.Node) map[string]int {
 	zoneCount := make(map[string]int)
 	for _, node := range selectedNodes {
 		zone := node.Labels[corev1.LabelTopologyZone]
-		if zone == "" {
-			zone = constants.NoZoneName
-		}
 		zoneCount[zone]++
 	}
 	return zoneCount
@@ -267,11 +264,7 @@ func filterSelectNodes(readyNodes []corev1.Node, selectedNodes []corev1.Node) []
 
 func scoreNode(node corev1.Node, zoneCount map[string]int) int {
 	zone := node.Labels[corev1.LabelTopologyZone]
-	if zone == "" {
-		zone = constants.NoZoneName
-	}
-	zoneScore := constants.MaxZoneScore - zoneCount[zone]
-	return zoneScore
+	return zoneCount[zone]
 }
 
 func (r *ImagePrefetchReconciler) createOrUpdateNodeImageSet(ctx context.Context, imgPrefetch *ofenv1.ImagePrefetch, selectedNodes []string) error {
