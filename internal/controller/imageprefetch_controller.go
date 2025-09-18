@@ -195,41 +195,76 @@ func getNodeNames(nodes []corev1.Node) []string {
 }
 
 func selectNodesByReplicas(imgPrefetch *ofenv1.ImagePrefetch, readyNodes []corev1.Node) ([]string, error) {
-	var selectNodes []string
+	var selectNodes []corev1.Node
 	targetReplicas := imgPrefetch.Spec.Replicas
 
 	if len(readyNodes) < targetReplicas {
 		return nil, fmt.Errorf("not enough nodes available: %d < %d", len(readyNodes), targetReplicas)
 	}
 
+	readyNodesMap := make(map[string]corev1.Node)
+	for _, node := range readyNodes {
+		readyNodesMap[node.Name] = node
+	}
+
 	readyNodesName := getNodeNames(readyNodes)
-	for _, node := range imgPrefetch.Status.SelectedNodes {
+	for _, nodeName := range imgPrefetch.Status.SelectedNodes {
 		if len(selectNodes) >= targetReplicas {
-			break
+			return getNodeNames(selectNodes), nil
 		}
-
-		if slices.Contains(readyNodesName, node) {
-			selectNodes = append(selectNodes, node)
+		if slices.Contains(readyNodesName, nodeName) {
+			selectNodes = append(selectNodes, readyNodesMap[nodeName])
 		}
 	}
 
-	if len(selectNodes) < targetReplicas {
-		sort.Slice(readyNodes, func(i, j int) bool {
-			return len(readyNodes[i].Status.Images) < len(readyNodes[j].Status.Images)
+	for i := 0; i < len(readyNodes); i++ {
+		if len(selectNodes) >= targetReplicas {
+			return getNodeNames(selectNodes), nil
+		}
+
+		candidates := filterSelectNodes(readyNodes, selectNodes)
+		if len(candidates) == 0 {
+			return nil, fmt.Errorf("no more nodes available for selection")
+		}
+
+		zoneCount := getZoneCount(selectNodes)
+		sort.Slice(candidates, func(i, j int) bool {
+			si := scoreNode(candidates[i], zoneCount)
+			sj := scoreNode(candidates[j], zoneCount)
+			return si < sj
 		})
-
-		for _, node := range readyNodes {
-			if len(selectNodes) >= targetReplicas {
-				break
-			}
-
-			if !slices.Contains(selectNodes, node.Name) {
-				selectNodes = append(selectNodes, node.Name)
-			}
-		}
+		selectNodes = append(selectNodes, candidates[0])
 	}
 
-	return selectNodes, nil
+	return getNodeNames(selectNodes), nil
+}
+
+func getZoneCount(selectedNodes []corev1.Node) map[string]int {
+	zoneCount := make(map[string]int)
+	for _, node := range selectedNodes {
+		zone := node.Labels[corev1.LabelTopologyZone]
+		zoneCount[zone]++
+	}
+	return zoneCount
+}
+
+func filterSelectNodes(readyNodes []corev1.Node, selectedNodes []corev1.Node) []corev1.Node {
+	var candidates []corev1.Node
+	selectedSet := make(map[string]bool)
+	for _, node := range selectedNodes {
+		selectedSet[node.Name] = true
+	}
+	for _, node := range readyNodes {
+		if !selectedSet[node.Name] {
+			candidates = append(candidates, node)
+		}
+	}
+	return candidates
+}
+
+func scoreNode(node corev1.Node, zoneCount map[string]int) int {
+	zone := node.Labels[corev1.LabelTopologyZone]
+	return zoneCount[zone]
 }
 
 func (r *ImagePrefetchReconciler) createOrUpdateNodeImageSet(ctx context.Context, imgPrefetch *ofenv1.ImagePrefetch, selectedNodes []string) error {
