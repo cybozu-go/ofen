@@ -82,6 +82,7 @@ func (r *ImagePrefetchReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		return ctrl.Result{}, fmt.Errorf("failed to select target nodes: %w", err)
 	}
 
+	sort.Strings(selectNodes)
 	err = r.createOrUpdateNodeImageSet(ctx, &imgPrefetch, selectNodes)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to create or update NodeImageSet: %w", err)
@@ -403,7 +404,6 @@ func getNodeImageSetName(imgPrefetch *ofenv1.ImagePrefetch, nodeName string) (st
 
 func (r *ImagePrefetchReconciler) updateStatus(ctx context.Context, imgPrefetch *ofenv1.ImagePrefetch, selectedNodes []string) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
-	sort.Strings(selectedNodes)
 	imgPrefetchSSA := ofenv1apply.ImagePrefetch(imgPrefetch.Name, imgPrefetch.Namespace).
 		WithStatus(
 			ofenv1apply.ImagePrefetchStatus().
