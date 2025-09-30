@@ -201,18 +201,13 @@ func (p *ImagePuller) PullImage(ctx context.Context, nodeImageSetName, ref strin
 
 	imageStatus.StopPulling()
 	if err != nil {
-		if errdefs.IsNotFound(err) && registryPolicy == ofenv1.RegistryPolicyMirrorOnly {
-			// If the image is not found and the policy is MirrorOnly, we treat it as a non-fatal error.
-			p.logger.Info("image not found in mirror registry, skipping pull", "image", ref)
-		} else {
-			imageStatus.SetError(err)
-		}
+		imageStatus.SetError(err)
 	}
 
 	return err
 }
 
-func (p *ImagePuller) GetImageStatus(ctx context.Context, nodeImageSetName, imageName string) (string, string, error) {
+func (p *ImagePuller) GetImageStatus(ctx context.Context, nodeImageSetName, imageName string, registryPolicy ofenv1.RegistryPolicy) (string, string, error) {
 	value, ok := p.status.Load(nodeImageSetName)
 	if !ok {
 		return "", "", nil
@@ -238,6 +233,12 @@ func (p *ImagePuller) GetImageStatus(ctx context.Context, nodeImageSetName, imag
 	}
 	imageErr := imageStatus.GetError()
 	if imageErr != nil {
+		// When using mirror-only registry policy, treat image not found errors as temporary failures.
+		// This handles cases where the image hasn't been cached in the registry mirror yet due to
+		// timing issues during the image pull process.
+		if errdefs.IsNotFound(imageErr) && registryPolicy == ofenv1.RegistryPolicyMirrorOnly {
+			return ofenv1.ImageDownloadTemporarilyFailed, imageErr.Error(), nil
+		}
 		return ofenv1.ImageDownloadFailed, imageErr.Error(), nil
 	}
 

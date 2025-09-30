@@ -9,6 +9,7 @@ import (
 
 	eventtypes "github.com/containerd/containerd/api/events"
 	"github.com/containerd/containerd/v2/core/events"
+	"github.com/containerd/errdefs"
 	"github.com/containerd/typeurl/v2"
 	"github.com/go-logr/logr"
 	"github.com/stretchr/testify/assert"
@@ -261,14 +262,14 @@ func TestImagePullerGetImageStatusStates(t *testing.T) {
 	puller.NewNodeImageSetStatus(testNodeImageSetName)
 
 	// Test WaitingForImageDownload state (initial state)
-	status, message, err := puller.GetImageStatus(ctx, testNodeImageSetName, testImageName)
+	status, message, err := puller.GetImageStatus(ctx, testNodeImageSetName, testImageName, ofenv1.RegistryPolicyDefault)
 	assert.NoError(t, err)
 	assert.Equal(t, ofenv1.WaitingForImageDownload, status)
 	assert.Empty(t, message)
 
 	// Test ImageDownloaded state
 	fakeClient.SetImageExists(testImageName, true)
-	status, message, err = puller.GetImageStatus(ctx, testNodeImageSetName, testImageName)
+	status, message, err = puller.GetImageStatus(ctx, testNodeImageSetName, testImageName, ofenv1.RegistryPolicyDefault)
 	assert.NoError(t, err)
 	assert.Equal(t, ofenv1.ImageDownloaded, status)
 	assert.Empty(t, message)
@@ -281,7 +282,7 @@ func TestImagePullerGetImageStatusStates(t *testing.T) {
 	imageStatus := nodeStatus.GetOrCreateImageStatus(testImageName)
 	imageStatus.SetImagePulling(true)
 
-	status, message, err = puller.GetImageStatus(ctx, testNodeImageSetName, testImageName)
+	status, message, err = puller.GetImageStatus(ctx, testNodeImageSetName, testImageName, ofenv1.RegistryPolicyDefault)
 	assert.NoError(t, err)
 	assert.Equal(t, ofenv1.ImageDownloadInProgress, status)
 	assert.Empty(t, message)
@@ -291,10 +292,28 @@ func TestImagePullerGetImageStatusStates(t *testing.T) {
 	testErr := fmt.Errorf("pull failed")
 	imageStatus.SetError(testErr)
 
-	status, message, err = puller.GetImageStatus(ctx, testNodeImageSetName, testImageName)
+	status, message, err = puller.GetImageStatus(ctx, testNodeImageSetName, testImageName, ofenv1.RegistryPolicyDefault)
 	assert.NoError(t, err)
 	assert.Equal(t, ofenv1.ImageDownloadFailed, status)
 	assert.Equal(t, "pull failed", message)
+
+	// Test ImageDownloadFailed state with a temporary error
+	imageStatus.ClearError()
+	imageStatus.SetImagePulling(false)
+	imageStatus.SetError(errdefs.ErrNotFound)
+	status, message, err = puller.GetImageStatus(ctx, testNodeImageSetName, testImageName, ofenv1.RegistryPolicyDefault)
+	assert.NoError(t, err)
+	assert.Equal(t, ofenv1.ImageDownloadFailed, status)
+	assert.Equal(t, "not found", message)
+
+	// Test ImageDownloadTemporarilyFailed state
+	imageStatus.ClearError()
+	imageStatus.SetImagePulling(false)
+	imageStatus.SetError(errdefs.ErrNotFound)
+	status, message, err = puller.GetImageStatus(ctx, testNodeImageSetName, testImageName, ofenv1.RegistryPolicyMirrorOnly)
+	assert.NoError(t, err)
+	assert.Equal(t, ofenv1.ImageDownloadTemporarilyFailed, status)
+	assert.Equal(t, "not found", message)
 }
 
 func TestImagePullerGetImageStatusNonexistentNodeImageSet(t *testing.T) {
@@ -306,7 +325,7 @@ func TestImagePullerGetImageStatusNonexistentNodeImageSet(t *testing.T) {
 
 	ctx := context.Background()
 
-	status, message, err := puller.GetImageStatus(ctx, "nonexistent", testImageName)
+	status, message, err := puller.GetImageStatus(ctx, "nonexistent", testImageName, ofenv1.RegistryPolicyDefault)
 	assert.NoError(t, err)
 	assert.Empty(t, status)
 	assert.Empty(t, message)
