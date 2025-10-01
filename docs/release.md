@@ -15,15 +15,31 @@ Follow [semantic versioning 2.0.0][semver] to choose the new version number.
 
 ## Bump version
 
-1. Determine a new version number. Then set `VERSION` variable.
+1. Determine a new version number and set the `VERSION` variable.
 
     ```console
-    # Set VERSION and confirm it. It should not have "v" prefix.
+    # Set VERSION and confirm it. It should not have a "v" prefix.
     $ VERSION=x.y.z
     $ echo $VERSION
     ```
 
-2. Add a git tag to the main HEAD, then push it.
+2. Update the chart version and appVersion in `charts/ofen/Chart.yaml`.
+
+    ```console
+    $ sed -i -E "s/^version: .+/version: $VERSION/" charts/ofen/Chart.yaml
+    $ sed -i -E "s/^appVersion: .+/appVersion: \"$VERSION\"/" charts/ofen/Chart.yaml
+    ```
+
+3. Create a PR to bump the version and merge it.
+
+    ```console
+    $ git checkout -b bump-version-to-$VERSION
+    $ git add charts/ofen/Chart.yaml
+    $ git commit -m "Bump version to $VERSION"
+    $ git push
+    ```
+
+4. Add a git tag to the main branch HEAD and push it.
 
     ```console
     # Set VERSION again.
