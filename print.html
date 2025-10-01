@@ -401,14 +401,28 @@ Please refer to <code>.github/release.yml</code> for the kind of labels.</p>
 <h2 id="bump-version"><a class="header" href="#bump-version">Bump version</a></h2>
 <ol>
 <li>
-<p>Determine a new version number. Then set <code>VERSION</code> variable.</p>
-<pre><code class="language-console"># Set VERSION and confirm it. It should not have "v" prefix.
+<p>Determine a new version number and set the <code>VERSION</code> variable.</p>
+<pre><code class="language-console"># Set VERSION and confirm it. It should not have a "v" prefix.
 $ VERSION=x.y.z
 $ echo $VERSION
 </code></pre>
 </li>
 <li>
-<p>Add a git tag to the main HEAD, then push it.</p>
+<p>Update the chart version and appVersion in <code>charts/ofen/Chart.yaml</code>.</p>
+<pre><code class="language-console">$ sed -i -E "s/^version: .+/version: $VERSION/" charts/ofen/Chart.yaml
+$ sed -i -E "s/^appVersion: .+/appVersion: \"$VERSION\"/" charts/ofen/Chart.yaml
+</code></pre>
+</li>
+<li>
+<p>Create a PR to bump the version and merge it.</p>
+<pre><code class="language-console">$ git checkout -b bump-version-to-$VERSION
+$ git add charts/ofen/Chart.yaml
+$ git commit -m "Bump version to $VERSION"
+$ git push
+</code></pre>
+</li>
+<li>
+<p>Add a git tag to the main branch HEAD and push it.</p>
 <pre><code class="language-console"># Set VERSION again.
 $ VERSION=x.y.z
 $ echo $VERSION
