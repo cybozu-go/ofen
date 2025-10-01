@@ -1,5 +1,4 @@
 ## Append samples of your project ##
 resources:
 - ofen_v1_imageprefetch.yaml
-- ofen_v1_nodeimageset.yaml
 # +kubebuilder:scaffold:manifestskustomizesamples
