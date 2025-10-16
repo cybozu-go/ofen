@@ -14,7 +14,19 @@ spec:
     singular: imageprefetch
   scope: Namespaced
   versions:
-  - name: v1
+  - additionalPrinterColumns:
+    - description: The number of nodes that should have the images pre-downloaded
+      jsonPath: .status.desiredNodes
+      name: DesiredNodes
+      type: integer
+    - description: The number of nodes that have successfully pre-downloaded the images
+      jsonPath: .status.imagePulledNodes
+      name: ImagePulledNodes
+      type: integer
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1
     schema:
       openAPIV3Schema:
         description: ImagePrefetch is the Schema for the imageprefetches API

@@ -66,14 +66,17 @@ type ImagePrefetchStatus struct {
 }
 
 const (
-	ConditionReady           = "Ready"
-	ConditionProgressing     = "Progressing"
-	ConditionImagePullFailed = "ImagePullFailed"
+	ConditionReady                = "Ready"
+	ConditionNodeImageSetsCreated = "NodeImageSetsCreated"
+	ConditionNoImagePullFailed    = "NoImagePullFailed"
 )
 
 // +genclient
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
+// +kubebuilder:printcolumn:name="DesiredNodes",type="integer",JSONPath=".status.desiredNodes",description="The number of nodes that should have the images pre-downloaded"
+// +kubebuilder:printcolumn:name="ImagePulledNodes",type="integer",JSONPath=".status.imagePulledNodes",description="The number of nodes that have successfully pre-downloaded the images"
+// +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 
 // ImagePrefetch is the Schema for the imageprefetches API
 type ImagePrefetch struct {
