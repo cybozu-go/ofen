@@ -59,10 +59,10 @@ spec:
               mountPath: {{ .Values.daemon.containerdSockPath }}
             - name: containerd-host-dir
               mountPath: {{ .Values.daemon.containerdHostDirPath }}
-      securityContext:
-        capabilities:
-          drop:
-            - ALL
+          securityContext:
+            capabilities:
+              drop:
+                - ALL
       serviceAccountName: '{{ template "ofen.fullname" . }}-controller-manager'
       terminationGracePeriodSeconds: 10
       {{- with .Values.daemon.imagePullSecrets }}
