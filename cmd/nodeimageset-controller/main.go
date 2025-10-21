@@ -15,6 +15,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	k8smetrics "sigs.k8s.io/controller-runtime/pkg/metrics"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/filters"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
@@ -22,6 +23,7 @@ import (
 	ofenv1 "github.com/cybozu-go/ofen/api/v1"
 	"github.com/cybozu-go/ofen/internal/controller"
 	"github.com/cybozu-go/ofen/internal/imgmanager"
+	"github.com/cybozu-go/ofen/internal/metrics"
 )
 
 var (
@@ -182,6 +184,7 @@ func main() {
 		queue.ShutDown()
 	}()
 
+	metrics.Register(k8smetrics.Registry)
 	if err := mgr.Start(ctx); err != nil {
 		setupLog.Error(err, "problem running nodeimageset controller")
 		os.Exit(1)

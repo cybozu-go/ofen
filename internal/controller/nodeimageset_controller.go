@@ -28,6 +28,7 @@ import (
 	ofenv1apply "github.com/cybozu-go/ofen/internal/applyconfigurations/api/v1"
 	"github.com/cybozu-go/ofen/internal/constants"
 	"github.com/cybozu-go/ofen/internal/imgmanager"
+	"github.com/cybozu-go/ofen/internal/metrics"
 )
 
 // NodeImageSetReconciler reconciles a NodeImageSet object
@@ -68,6 +69,10 @@ func (r *NodeImageSetReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			if err := r.Update(ctx, &nodeImageSet); err != nil {
 				return ctrl.Result{}, err
 			}
+			// Delete all metrics for this NodeImageSet
+			metrics.ImageInfoVec.DeletePartialMatch(map[string]string{"name": nodeImageSet.Name})
+			metrics.ImageSizeBytesVec.DeletePartialMatch(map[string]string{"name": nodeImageSet.Name})
+			metrics.ImagePrefetchDurationSecondsVec.DeletePartialMatch(map[string]string{"name": nodeImageSet.Name})
 			logger.Info("finished finalization")
 		}
 
@@ -172,6 +177,8 @@ func (r *NodeImageSetReconciler) updateStatus(ctx context.Context, nodeImageSet 
 		)
 
 	for _, image := range nodeImageSet.Spec.Images {
+		metrics.ImageInfoVec.WithLabelValues(nodeImageSet.Name, image, string(nodeImageSet.Spec.RegistryPolicy), r.NodeName).Set(1)
+
 		var errMsg string
 		status, errMsg, err := r.ImagePuller.GetImageStatus(ctx, nodeImageSet.Name, image, nodeImageSet.Spec.RegistryPolicy)
 		if err != nil {
@@ -184,6 +191,17 @@ func (r *NodeImageSetReconciler) updateStatus(ctx context.Context, nodeImageSet 
 				WithState(status).
 				WithError(errMsg),
 		)
+
+		if status == ofenv1.ImageDownloaded {
+			imageSize := r.ImagePuller.GetImageSize(nodeImageSet.Name, image)
+			if imageSize > 0 {
+				metrics.ImageSizeBytesVec.WithLabelValues(nodeImageSet.Name, image, r.NodeName).Set(float64(imageSize))
+			}
+			pullDuration := r.ImagePuller.GetPullDuration(nodeImageSet.Name, image)
+			if pullDuration > 0 {
+				metrics.ImagePrefetchDurationSecondsVec.WithLabelValues(nodeImageSet.Name, image, r.NodeName).Set(float64(pullDuration))
+			}
+		}
 	}
 
 	if desiredImage == downloadedImage {

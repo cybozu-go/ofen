@@ -103,13 +103,13 @@ func (f *FakeContainerd) RegisterImagePullError(ref string, err error) {
 	f.pullErrorOverrides[ref] = err
 }
 
-func (f *FakeContainerd) PullImage(ctx context.Context, ref string, policy ofenv1.RegistryPolicy, secrets *[]corev1.Secret) error {
+func (f *FakeContainerd) PullImage(ctx context.Context, ref string, policy ofenv1.RegistryPolicy, secrets *[]corev1.Secret) (int64, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
 	// Check for registered error overrides first
 	if err, ok := f.pullErrorOverrides[ref]; ok {
-		return err
+		return 0, err
 	}
 
 	// Simulate a delay for pulling the image
@@ -118,7 +118,7 @@ func (f *FakeContainerd) PullImage(ctx context.Context, ref string, policy ofenv
 	}
 	f.pulledImages[ref] = true
 
-	return nil
+	return 100, nil
 }
 
 func (f *FakeContainerd) SetPullDelay(delay time.Duration) {
