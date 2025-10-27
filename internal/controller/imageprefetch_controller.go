@@ -33,6 +33,7 @@ import (
 	ofenv1 "github.com/cybozu-go/ofen/api/v1"
 	ofenv1apply "github.com/cybozu-go/ofen/internal/applyconfigurations/api/v1"
 	"github.com/cybozu-go/ofen/internal/constants"
+	"github.com/cybozu-go/ofen/internal/metrics"
 	"github.com/cybozu-go/ofen/internal/util"
 )
 
@@ -110,6 +111,7 @@ func (r *ImagePrefetchReconciler) finalize(ctx context.Context, imgPrefetch *ofe
 			return fmt.Errorf("failed to delete NodeImageSets: %w", err)
 		}
 	}
+	r.removeMetrics(imgPrefetch)
 
 	controllerutil.RemoveFinalizer(imgPrefetch, constants.ImagePrefetchFinalizer)
 	return r.Update(ctx, imgPrefetch)
@@ -493,6 +495,8 @@ func (r *ImagePrefetchReconciler) updateStatus(ctx context.Context, imgPrefetch 
 		return ctrl.Result{}, fmt.Errorf("failed to update ImagePrefetch status: %w", err)
 	}
 
+	r.setMetrics(imgPrefetch)
+
 	return result, nil
 }
 
@@ -555,6 +559,23 @@ func (r *ImagePrefetchReconciler) applyImagePrefetchStatus(ctx context.Context, 
 	}
 
 	return r.Status().Patch(ctx, patch, client.Apply, client.ForceOwnership, client.FieldOwner(constants.ImagePrefetchFieldManager))
+}
+
+func (r *ImagePrefetchReconciler) setMetrics(imgPrefetch *ofenv1.ImagePrefetch) {
+	if meta.IsStatusConditionTrue(imgPrefetch.Status.Conditions, ofenv1.ConditionReady) {
+		metrics.ReadyVec.WithLabelValues(imgPrefetch.Namespace, imgPrefetch.Name).Set(1)
+	} else {
+		metrics.ReadyVec.WithLabelValues(imgPrefetch.Namespace, imgPrefetch.Name).Set(0)
+	}
+
+	metrics.ImagePulledNodesVec.WithLabelValues(imgPrefetch.Namespace, imgPrefetch.Name).Set(float64(imgPrefetch.Status.ImagePulledNodes))
+	metrics.ImagePullFailedNodesVec.WithLabelValues(imgPrefetch.Namespace, imgPrefetch.Name).Set(float64(imgPrefetch.Status.ImagePullFailedNodes))
+}
+
+func (r *ImagePrefetchReconciler) removeMetrics(imgPrefetch *ofenv1.ImagePrefetch) {
+	metrics.ReadyVec.DeleteLabelValues(imgPrefetch.Namespace, imgPrefetch.Name)
+	metrics.ImagePulledNodesVec.DeleteLabelValues(imgPrefetch.Namespace, imgPrefetch.Name)
+	metrics.ImagePullFailedNodesVec.DeleteLabelValues(imgPrefetch.Namespace, imgPrefetch.Name)
 }
 
 // SetupWithManager sets up the controller with the Manager.

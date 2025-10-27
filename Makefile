@@ -148,7 +148,7 @@ YQ ?= $(LOCALBIN)/yq
 KUSTOMIZE_VERSION ?= v5.7.1
 CONTROLLER_TOOLS_VERSION ?= v0.19.0
 ENVTEST_VERSION ?= release-0.22
-GOLANGCI_LINT_VERSION ?= v2.4.0
+GOLANGCI_LINT_VERSION ?= 2.5.0
 GINKGO_VERSION ?= v2.25.3
 CODE_GENERATOR_VERSION ?= v0.34.1
 MODELS_SCHEMA_VERSION ?= v1.34.1
@@ -173,7 +173,9 @@ $(ENVTEST): $(LOCALBIN)
 .PHONY: golangci-lint
 golangci-lint: $(GOLANGCI_LINT) ## Download golangci-lint locally if necessary.
 $(GOLANGCI_LINT): $(LOCALBIN)
-	$(call go-install-tool,$(GOLANGCI_LINT),github.com/golangci/golangci-lint/v2/cmd/golangci-lint,$(GOLANGCI_LINT_VERSION))
+	curl -sLO "https://github.com/golangci/golangci-lint/releases/download/v$(GOLANGCI_LINT_VERSION)/golangci-lint-$(GOLANGCI_LINT_VERSION)-linux-amd64.tar.gz" && \
+	tar -xzf golangci-lint-$(GOLANGCI_LINT_VERSION)-linux-amd64.tar.gz --strip-components=1 -C $(LOCALBIN)  golangci-lint-$(GOLANGCI_LINT_VERSION)-linux-amd64/golangci-lint && \
+	rm -f golangci-lint-$(GOLANGCI_LINT_VERSION)-linux-amd64.tar.gz
 
 .PHONY: ginkgo
 ginkgo: $(GINKGO) ## Download ginkgo locally if necessary.

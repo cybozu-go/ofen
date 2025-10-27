@@ -19,7 +19,7 @@ import (
 
 type ContainerdClient interface {
 	IsImageExists(ctx context.Context, ref string) (bool, error)
-	PullImage(ctx context.Context, ref string, policy ofenv1.RegistryPolicy, secrets *[]corev1.Secret) error
+	PullImage(ctx context.Context, ref string, policy ofenv1.RegistryPolicy, secrets *[]corev1.Secret) (int64, error)
 	Subscribe(ctx context.Context) (<-chan *events.Envelope, <-chan error)
 }
 
@@ -52,7 +52,7 @@ func (c *Containerd) IsImageExists(ctx context.Context, ref string) (bool, error
 	return len(images) != 0, nil
 }
 
-func (c *Containerd) PullImage(ctx context.Context, ref string, policy ofenv1.RegistryPolicy, secrets *[]corev1.Secret) error {
+func (c *Containerd) PullImage(ctx context.Context, ref string, policy ofenv1.RegistryPolicy, secrets *[]corev1.Secret) (int64, error) {
 	ctx = namespaces.WithNamespace(ctx, c.containerdConfig.Namespace)
 
 	tokens := map[string]Credentials{}
@@ -60,7 +60,7 @@ func (c *Containerd) PullImage(ctx context.Context, ref string, policy ofenv1.Re
 		var err error
 		tokens, err = convertCredentials(*secrets)
 		if err != nil {
-			return fmt.Errorf("failed to convert credentials: %w", err)
+			return 0, fmt.Errorf("failed to convert credentials: %w", err)
 		}
 	}
 
@@ -71,7 +71,7 @@ func (c *Containerd) PullImage(ctx context.Context, ref string, policy ofenv1.Re
 	case ofenv1.RegistryPolicyMirrorOnly:
 		useMirrorOnly = true
 	default:
-		return fmt.Errorf("unknown registry policy %q", policy)
+		return 0, fmt.Errorf("unknown registry policy %q", policy)
 	}
 
 	resolver := c.setupResolver(ctx, useMirrorOnly, tokens)
@@ -83,12 +83,16 @@ func (c *Containerd) PullImage(ctx context.Context, ref string, policy ofenv1.Re
 		}),
 	}
 
-	_, err := c.client.Pull(ctx, ref, pullOptions...)
+	image, err := c.client.Pull(ctx, ref, pullOptions...)
 	if err != nil {
-		return fmt.Errorf("failed to pull image %s: %w", ref, err)
+		return 0, fmt.Errorf("failed to pull image %s: %w", ref, err)
 	}
 
-	return nil
+	size, err := image.Size(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("failed to get image size for %s: %w", ref, err)
+	}
+	return size, nil
 }
 
 func (c *Containerd) setupResolver(ctx context.Context, useMirrorOnly bool, tokens map[string]Credentials) remotes.Resolver {

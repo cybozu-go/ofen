@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"slices"
 	"sync"
+	"time"
 
 	eventtypes "github.com/containerd/containerd/api/events"
 	"github.com/containerd/containerd/v2/core/events"
@@ -21,16 +22,22 @@ type NodeImageSetStatus struct {
 }
 
 type ImagePullStatus struct {
-	ImagePulling bool
-	Error        error
-	mutex        sync.Mutex
+	ImagePulling     bool
+	Error            error
+	PullStartTime    int64
+	PullCompleteTime int64
+	ImageSize        int64
+	mutex            sync.Mutex
 }
 
 func NewImagePullStatus() *ImagePullStatus {
 	return &ImagePullStatus{
-		ImagePulling: false,
-		Error:        nil,
-		mutex:        sync.Mutex{},
+		ImagePulling:     false,
+		Error:            nil,
+		PullStartTime:    0,
+		PullCompleteTime: 0,
+		ImageSize:        0,
+		mutex:            sync.Mutex{},
 	}
 }
 
@@ -64,6 +71,18 @@ func (s *ImagePullStatus) ClearError() {
 	s.Error = nil
 }
 
+func (s *ImagePullStatus) SetImageSize(size int64) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	s.ImageSize = size
+}
+
+func (s *ImagePullStatus) GetImageSize() int64 {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	return s.ImageSize
+}
+
 func (s *ImagePullStatus) StartPulling() {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
@@ -71,10 +90,20 @@ func (s *ImagePullStatus) StartPulling() {
 	s.Error = nil
 }
 
+func (s *ImagePullStatus) GetPullDuration() int64 {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	if s.PullStartTime == 0 || s.PullCompleteTime == 0 {
+		return 0
+	}
+	return s.PullCompleteTime - s.PullStartTime
+}
+
 func (s *ImagePullStatus) StopPulling() {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 	s.ImagePulling = false
+	s.PullCompleteTime = time.Now().Unix()
 }
 
 func (s *ImagePullStatus) TryStartPulling() bool {
@@ -87,6 +116,8 @@ func (s *ImagePullStatus) TryStartPulling() bool {
 
 	s.ImagePulling = true
 	s.Error = nil
+	s.PullStartTime = time.Now().Unix()
+
 	return true
 }
 
@@ -197,14 +228,15 @@ func (p *ImagePuller) PullImage(ctx context.Context, nodeImageSetName, ref strin
 		return nil
 	}
 
-	err = p.containerdClient.PullImage(ctx, ref, registryPolicy, secrets)
-
+	size, err := p.containerdClient.PullImage(ctx, ref, registryPolicy, secrets)
 	imageStatus.StopPulling()
 	if err != nil {
 		imageStatus.SetError(err)
+		return err
 	}
+	imageStatus.SetImageSize(size)
 
-	return err
+	return nil
 }
 
 func (p *ImagePuller) GetImageStatus(ctx context.Context, nodeImageSetName, imageName string, registryPolicy ofenv1.RegistryPolicy) (string, string, error) {
@@ -243,6 +275,36 @@ func (p *ImagePuller) GetImageStatus(ctx context.Context, nodeImageSetName, imag
 	}
 
 	return ofenv1.WaitingForImageDownload, "", nil
+}
+
+func (p *ImagePuller) GetImageSize(nodeImageSetName, imageName string) int64 {
+	value, ok := p.status.Load(nodeImageSetName)
+	if !ok {
+		return 0
+	}
+
+	nodeStatus := value.(*NodeImageSetStatus)
+	imageStatus, ok := nodeStatus.GetImageStatus(imageName)
+	if !ok {
+		return 0
+	}
+
+	return imageStatus.GetImageSize()
+}
+
+func (p *ImagePuller) GetPullDuration(nodeImageSetName, imageName string) int64 {
+	value, ok := p.status.Load(nodeImageSetName)
+	if !ok {
+		return 0
+	}
+
+	nodeStatus := value.(*NodeImageSetStatus)
+	imageStatus, ok := nodeStatus.GetImageStatus(imageName)
+	if !ok {
+		return 0
+	}
+
+	return imageStatus.GetPullDuration()
 }
 
 func (p *ImagePuller) SubscribeDeleteEvent(ctx context.Context) (<-chan string, error) {

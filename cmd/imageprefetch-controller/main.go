@@ -13,12 +13,14 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	k8smetrics "sigs.k8s.io/controller-runtime/pkg/metrics"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/filters"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	ofenv1 "github.com/cybozu-go/ofen/api/v1"
 	"github.com/cybozu-go/ofen/internal/controller"
+	"github.com/cybozu-go/ofen/internal/metrics"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -150,6 +152,8 @@ func main() {
 		setupLog.Error(err, "unable to set up ready check")
 		os.Exit(1)
 	}
+
+	metrics.Register(k8smetrics.Registry)
 
 	setupLog.Info("starting imageprefetch controller")
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
