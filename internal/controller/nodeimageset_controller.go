@@ -65,14 +65,16 @@ func (r *NodeImageSetReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		if controllerutil.ContainsFinalizer(&nodeImageSet, constants.NodeImageSetFinalizer) {
 			logger.Info("starting finalization")
 			r.ImagePuller.DeleteNodeImageSetStatus(nodeImageSet.Name)
-			controllerutil.RemoveFinalizer(&nodeImageSet, constants.NodeImageSetFinalizer)
-			if err := r.Update(ctx, &nodeImageSet); err != nil {
-				return ctrl.Result{}, err
-			}
+
 			// Delete all metrics for this NodeImageSet
 			metrics.ImageInfoVec.DeletePartialMatch(map[string]string{"name": nodeImageSet.Name})
 			metrics.ImageSizeBytesVec.DeletePartialMatch(map[string]string{"name": nodeImageSet.Name})
 			metrics.ImagePrefetchDurationSecondsVec.DeletePartialMatch(map[string]string{"name": nodeImageSet.Name})
+
+			controllerutil.RemoveFinalizer(&nodeImageSet, constants.NodeImageSetFinalizer)
+			if err := r.Update(ctx, &nodeImageSet); err != nil {
+				return ctrl.Result{}, err
+			}
 			logger.Info("finished finalization")
 		}
 
