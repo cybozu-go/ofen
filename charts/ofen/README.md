@@ -40,6 +40,7 @@ $ helm install --create-namespace --namespace ofen-system ofen -f values.yaml of
 | controller.imagePullSecrets          | list   | `[]`                                          | Secrets for pulling the ofen-controller image from a private repository.           |
 | controller.resources                 | object | `{"requests":{"cpu":"100m","memory":"20Mi"}}` | Resource requests and limits for the ofen-controller Deployment.                   |
 | controller.extraArgs                 | list   | `[]`                                          | Additional command line arguments to pass to the ofen-controller binary.           |
+| controller.extraEnv                  | list   | `[]`                                          | Additional environment variables to set in the ofen-controller container.          |
 | controller.nodeSelector              | object | `{}`                                          | NodeSelector used by the ofen-controller.                                          |
 | controller.affinity                  | object | `{}`                                          | Affinity used by the ofen-controller.                                              |
 | controller.tolerations               | list   | `[]`                                          | Tolerations used by the ofen-controller.                                           |
@@ -51,6 +52,7 @@ $ helm install --create-namespace --namespace ofen-system ofen -f values.yaml of
 | daemon.imagePullSecrets              | list   | `[]`                                          | Secrets for pulling the ofen-daemon image from a private repository.               |
 | daemon.resources                     | object | `{"requests":{"cpu":"100m","memory":"20Mi"}}` | Resource requests and limits for the ofen-daemon DaemonSet.                        |
 | daemon.extraArgs                     | list   | `[]`                                          | Additional command line arguments to pass to the ofen-daemon binary.               |
+| daemon.extraEnv                      | list   | `[]`                                          | Additional environment variables to set in the ofen-daemon container.              |
 | daemon.containerdSockPath            | string | `"/run/containerd/containerd.sock"`           | Path to the containerd socket.                                                     |
 | daemon.containerdHostDirPath         | string | `"/etc/containerd/certs.d"`                   | Path to the host directory where containerd certificate configurations are stored. |
 | daemon.nodeSelector                  | object | `{}`                                          | Node labels for scheduling the ofen-daemon.                                        |

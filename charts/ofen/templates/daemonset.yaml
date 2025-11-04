@@ -32,6 +32,9 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: spec.nodeName
+          {{- with .Values.daemon.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           ports:
             - containerPort: 8081
               name: health

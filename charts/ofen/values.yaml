@@ -32,6 +32,9 @@ controller:
   # controller.extraArgs -- Additional command line arguments to pass to the ofen-controller binary.
   extraArgs: []
   
+  # controller.extraEnv -- Additional environment variables to set in the ofen-controller container.
+  extraEnv: []
+  
   # nodeSelector -- nodeSelector used by ofen-controller.
   nodeSelector: {}
   
@@ -84,6 +87,9 @@ daemon:
 
   # daemon.extraArgs -- Additional command line arguments to pass to the ofen-daemon binary.
   extraArgs: []
+  
+  # daemon.extraEnv -- Additional environment variables to set in the ofen-daemon container.
+  extraEnv: []
  
   # daemon.containerdSockPath -- Path to the containerd socket.
   containerdSockPath: /run/containerd/containerd.sock
