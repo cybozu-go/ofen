@@ -36,7 +36,8 @@ func init() {
 }
 
 type Config struct {
-	imagePullNodeLimit int
+	imagePullNodeLimit                 int
+	maxConcurrentNodeImageSetCreations int
 }
 
 func main() {
@@ -59,6 +60,8 @@ func main() {
 		"If set, HTTP/2 will be enabled for the metrics and webhook servers")
 	flag.IntVar(&config.imagePullNodeLimit, "image-pull-node-limit", 1,
 		"The maximum number of nodes that can pull images concurrently.")
+	flag.IntVar(&config.maxConcurrentNodeImageSetCreations, "max-concurrent-nodeimageset-creations", 1,
+		"The maximum number of NodeImageSets to create or update concurrently.")
 	opts := zap.Options{
 		Development: true,
 	}
@@ -135,9 +138,10 @@ func main() {
 	}
 
 	if err = (&controller.ImagePrefetchReconciler{
-		Client:             mgr.GetClient(),
-		Scheme:             mgr.GetScheme(),
-		ImagePullNodeLimit: config.imagePullNodeLimit,
+		Client:                             mgr.GetClient(),
+		Scheme:                             mgr.GetScheme(),
+		ImagePullNodeLimit:                 config.imagePullNodeLimit,
+		MaxConcurrentNodeImageSetCreations: config.maxConcurrentNodeImageSetCreations,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "ImagePrefetch")
 		os.Exit(1)

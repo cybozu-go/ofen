@@ -40,8 +40,9 @@ import (
 // ImagePrefetchReconciler reconciles a ImagePrefetch object
 type ImagePrefetchReconciler struct {
 	client.Client
-	Scheme             *runtime.Scheme
-	ImagePullNodeLimit int
+	Scheme                             *runtime.Scheme
+	ImagePullNodeLimit                 int
+	MaxConcurrentNodeImageSetCreations int
 }
 
 // +kubebuilder:rbac:groups=ofen.cybozu.io,resources=imageprefetches,verbs=get;list;watch;create;update;patch;delete
@@ -273,8 +274,22 @@ func scoreNode(node corev1.Node, zoneCount map[string]int) int {
 func (r *ImagePrefetchReconciler) createOrUpdateNodeImageSet(ctx context.Context, imgPrefetch *ofenv1.ImagePrefetch, selectedNodes []string) error {
 	logger := log.FromContext(ctx)
 
+	var nodeImageSetList ofenv1.NodeImageSetList
+	if err := r.List(ctx, &nodeImageSetList, client.MatchingLabels(map[string]string{
+		constants.OwnerImagePrefetchNamespace: imgPrefetch.Namespace,
+		constants.OwnerImagePrefetchName:      imgPrefetch.Name,
+	})); err != nil {
+		return fmt.Errorf("failed to list NodeImageSets: %w", err)
+	}
+
+	maxNodeImageSetsToProcess := getMaxNodeImageSetsToCreate(nodeImageSetList, r.MaxConcurrentNodeImageSetCreations, len(selectedNodes), imgPrefetch.Generation)
 	selectNodes := map[string]struct{}{}
 	for i, nodeName := range selectedNodes {
+		// Limit the number of NodeImageSets created or updated in one reconciliation loop
+		if i >= maxNodeImageSetsToProcess {
+			return nil
+		}
+
 		selectNodes[nodeName] = struct{}{}
 		nodeImageSetName, err := getNodeImageSetName(imgPrefetch, nodeName)
 		if err != nil {
@@ -308,8 +323,8 @@ func (r *ImagePrefetchReconciler) createOrUpdateNodeImageSet(ctx context.Context
 	}
 
 	// Delete unnecessary NodeImageSets
-	nodeImageSetList := &ofenv1.NodeImageSetList{}
-	if err := r.List(ctx, nodeImageSetList, client.MatchingLabels(map[string]string{
+	nodeImageSetList = ofenv1.NodeImageSetList{}
+	if err := r.List(ctx, &nodeImageSetList, client.MatchingLabels(map[string]string{
 		constants.OwnerImagePrefetchNamespace: imgPrefetch.Namespace,
 		constants.OwnerImagePrefetchName:      imgPrefetch.Name,
 	})); err != nil {
@@ -331,6 +346,23 @@ func (r *ImagePrefetchReconciler) createOrUpdateNodeImageSet(ctx context.Context
 	}
 
 	return nil
+}
+
+func getMaxNodeImageSetsToCreate(currentNodeImageSets ofenv1.NodeImageSetList, maxConcurrentNodeImageSetCreations int, desiredNodeImageSetsCount int, generation int64) int {
+	var readyNodeImageSetsCount = 0
+
+	for _, nodeImageSet := range currentNodeImageSets.Items {
+		if meta.IsStatusConditionTrue(nodeImageSet.Status.Conditions, ofenv1.ConditionImageAvailable) &&
+			nodeImageSet.Status.ImagePrefetchGeneration == generation &&
+			len(nodeImageSet.Spec.Images) == len(nodeImageSet.Status.ContainerImageStatuses) {
+			readyNodeImageSetsCount++
+		}
+	}
+
+	if readyNodeImageSetsCount < desiredNodeImageSetsCount {
+		return readyNodeImageSetsCount + maxConcurrentNodeImageSetCreations
+	}
+	return desiredNodeImageSetsCount
 }
 
 func (r *ImagePrefetchReconciler) applyNodeImageSet(ctx context.Context, nodeImageSet *ofenv1apply.NodeImageSetApplyConfiguration, name string) error {
