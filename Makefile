@@ -1,5 +1,5 @@
 include ./Makefile.common
-ENVTEST_K8S_VERSION = 1.34.0
+ENVTEST_K8S_VERSION = 1.34.1
 
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
@@ -145,15 +145,15 @@ KAPTEST ?= $(LOCALBIN)/kaptest
 YQ ?= $(LOCALBIN)/yq
 
 ## Tool Versions
-KUSTOMIZE_VERSION ?= v5.7.1
+KUSTOMIZE_VERSION ?= v5.8.0
 CONTROLLER_TOOLS_VERSION ?= v0.19.0
 ENVTEST_VERSION ?= release-0.22
-GOLANGCI_LINT_VERSION ?= 2.5.0
-GINKGO_VERSION ?= v2.25.3
-CODE_GENERATOR_VERSION ?= v0.34.1
-MODELS_SCHEMA_VERSION ?= v1.34.1
+GOLANGCI_LINT_VERSION ?= 2.6.2
+GINKGO_VERSION ?= v2.27.2
+CODE_GENERATOR_VERSION ?= v0.34.2
+MODELS_SCHEMA_VERSION ?= v1.34.2
 KAPTEST_VERSION ?= v0.1.2
-YQ_VERSION ?= v4.47.2
+YQ_VERSION ?= v4.48.2
 
 .PHONY: kustomize
 kustomize: $(KUSTOMIZE) ## Download kustomize locally if necessary.
