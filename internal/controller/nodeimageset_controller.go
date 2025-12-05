@@ -29,6 +29,7 @@ import (
 	"github.com/cybozu-go/ofen/internal/constants"
 	"github.com/cybozu-go/ofen/internal/imgmanager"
 	"github.com/cybozu-go/ofen/internal/metrics"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 // NodeImageSetReconciler reconciles a NodeImageSet object
@@ -67,10 +68,7 @@ func (r *NodeImageSetReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			r.ImagePuller.DeleteNodeImageSetStatus(nodeImageSet.Name)
 
 			// Delete all metrics for this NodeImageSet
-			metrics.ImageInfoVec.DeletePartialMatch(map[string]string{"name": nodeImageSet.Name})
-			metrics.ImageSizeBytesVec.DeletePartialMatch(map[string]string{"name": nodeImageSet.Name})
-			metrics.ImagePrefetchDurationSecondsVec.DeletePartialMatch(map[string]string{"name": nodeImageSet.Name})
-
+			removeNodeImageSetMetrics(nodeImageSet.Name)
 			controllerutil.RemoveFinalizer(&nodeImageSet, constants.NodeImageSetFinalizer)
 			if err := r.Update(ctx, &nodeImageSet); err != nil {
 				return ctrl.Result{}, err
@@ -166,6 +164,11 @@ func (r *NodeImageSetReconciler) updateStatus(ctx context.Context, nodeImageSet 
 	logger.Info("updating NodeImageSet status")
 	result := ctrl.Result{RequeueAfter: 10 * time.Second}
 
+	// If nodeimageset has been updated, remove old metrics
+	if nodeImageSet.Generation != nodeImageSet.Status.ObservedGeneration {
+		removeNodeImageSetMetrics(nodeImageSet.Name)
+	}
+
 	desiredImage := len(nodeImageSet.Spec.Images)
 	downloadedImage, failedImage := r.calculateImageStatus(ctx, nodeImageSet)
 
@@ -255,6 +258,13 @@ func (r *NodeImageSetReconciler) updateStatus(ctx context.Context, nodeImageSet 
 		return ctrl.Result{}, fmt.Errorf("failed to update status: %w", err)
 	}
 	return result, nil
+}
+
+func removeNodeImageSetMetrics(nodeImageSetName string) {
+	match := prometheus.Labels{"nodeimageset": nodeImageSetName}
+	metrics.ImageInfoVec.DeletePartialMatch(match)
+	metrics.ImageSizeBytesVec.DeletePartialMatch(match)
+	metrics.ImagePrefetchDurationSecondsVec.DeletePartialMatch(match)
 }
 
 func (r *NodeImageSetReconciler) calculateImageStatus(ctx context.Context, nis *ofenv1.NodeImageSet) (int, int) {
