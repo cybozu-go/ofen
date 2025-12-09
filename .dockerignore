@@ -1,1 +1,33 @@
-bin/
+# Version control
+.git
+.github
+.gitignore
+
+# Build artifacts
+bin
+*.test
+cover.out
+
+# Documentation
+docs
+**/*.md
+!README.md
+
+# Development tools
+.devcontainer
+.vscode
+.golangci.yml
+
+# Configuration and deployment
+charts
+config
+cr.yaml
+dockerfiles
+etc
+hack
+test
+
+# IDE and editor files
+.idea
+*.swp
+*.swo

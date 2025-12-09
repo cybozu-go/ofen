@@ -4,12 +4,21 @@ ARG TARGETOS
 ARG TARGETARCH
 
 WORKDIR /workspace
-COPY ./ .
-RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -a -o imageprefetch-controller cmd/imageprefetch-controller/main.go
+RUN --mount=type=cache,target=/go/pkg/mod/,sharing=locked \
+    --mount=type=bind,source=go.sum,target=go.sum \
+    --mount=type=bind,source=go.mod,target=go.mod \
+    go mod download 
+
+RUN --mount=type=cache,target=/root/.cache/go-build \
+    --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=bind,target=. \
+    CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -a -o /bin/imageprefetch-controller cmd/imageprefetch-controller/main.go
 
 FROM ghcr.io/cybozu/ubuntu:24.04
+LABEL org.opencontainers.image.source="https://github.com/cybozu-go/ofen"
+
 WORKDIR /
-COPY --from=builder /workspace/imageprefetch-controller .
+COPY --from=builder /bin/imageprefetch-controller .
 USER 10000:10000
 
 ENTRYPOINT ["/imageprefetch-controller"]
