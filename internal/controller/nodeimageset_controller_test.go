@@ -26,44 +26,6 @@ import (
 	"github.com/cybozu-go/ofen/internal/imgmanager"
 )
 
-type nodeImageSetBuilder struct {
-	object *ofenv1.NodeImageSet
-}
-
-func createNodeImageSet(name string) *nodeImageSetBuilder {
-	return &nodeImageSetBuilder{
-		object: &ofenv1.NodeImageSet{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: name,
-			},
-		},
-	}
-}
-
-func (b *nodeImageSetBuilder) withNodeName(nodeName string) *nodeImageSetBuilder {
-	b.object.Spec.NodeName = nodeName
-	return b
-}
-
-func (b *nodeImageSetBuilder) withImages(images []string) *nodeImageSetBuilder {
-	b.object.Spec.Images = images
-	return b
-}
-
-func (b *nodeImageSetBuilder) withRegistryPolicy(policy ofenv1.RegistryPolicy) *nodeImageSetBuilder {
-	b.object.Spec.RegistryPolicy = policy
-	return b
-}
-
-func (b *nodeImageSetBuilder) WithLabels(labels map[string]string) *nodeImageSetBuilder {
-	b.object.Labels = labels
-	return b
-}
-
-func (b *nodeImageSetBuilder) build() *ofenv1.NodeImageSet {
-	return b.object
-}
-
 func deleteNode(ctx context.Context, name string) error {
 	node := &corev1.Node{}
 	err := k8sClient.Get(ctx, client.ObjectKey{Name: name}, node)
