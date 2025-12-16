@@ -21,7 +21,7 @@ type nodeImageSetGarbageCollector struct {
 	interval  time.Duration
 }
 
-func NewNodeImageSetGarbageCollector(k8sClient client.Client, logger logr.Logger, interval time.Duration) *nodeImageSetGarbageCollector {
+func NewGarbageCollector(k8sClient client.Client, logger logr.Logger, interval time.Duration) *nodeImageSetGarbageCollector {
 	return &nodeImageSetGarbageCollector{
 		k8sClient: k8sClient,
 		logger:    logger,

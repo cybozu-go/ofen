@@ -37,7 +37,7 @@ var _ = Describe("NodeImageSet Garbage Collector", func() {
 			})
 			Expect(err).NotTo(HaveOccurred())
 
-			garbageCollector := NewNodeImageSetGarbageCollector(mgr.GetClient(), ctrl.Log.WithName("test-gc"), 1*time.Second)
+			garbageCollector := NewGarbageCollector(mgr.GetClient(), ctrl.Log.WithName("test-gc"), 1*time.Second)
 			err = mgr.Add(garbageCollector)
 			Expect(err).NotTo(HaveOccurred())
 
@@ -87,6 +87,41 @@ var _ = Describe("NodeImageSet Garbage Collector", func() {
 				n := &ofenv1.NodeImageSet{}
 				err := k8sClient.Get(ctx, client.ObjectKey{Name: nis.Name}, n)
 				g.Expect(err).To(HaveOccurred())
+			}).Should(Succeed())
+		})
+
+		It("should not remove NodeImageSets for existing nodes", func() {
+			existingNodeName := "gc-test-existing-node"
+			node := createNode(existingNodeName).Build()
+			err := k8sClient.Create(ctx, node)
+			Expect(err).NotTo(HaveOccurred())
+
+			nis := createNodeImageSet("gc-test-existing-node").
+				WithLabels(map[string]string{
+					constants.NodeName: existingNodeName,
+				}).
+				withNodeName(existingNodeName).
+				withImages(images).
+				withRegistryPolicy(ofenv1.RegistryPolicyDefault).
+				WithFinalizers([]string{constants.NodeImageSetFinalizer}).
+				build()
+			err = k8sClient.Create(ctx, nis)
+			Expect(err).NotTo(HaveOccurred())
+
+			Eventually(func(g Gomega) {
+				n := &ofenv1.NodeImageSet{}
+				err := k8sClient.Get(ctx, client.ObjectKey{Name: nis.Name}, n)
+				g.Expect(err).NotTo(HaveOccurred())
+			}).Should(Succeed())
+
+			// Wait for a while to ensure GC had time to run
+			time.Sleep(2 * time.Second)
+
+			Consistently(func(g Gomega) {
+				n := &ofenv1.NodeImageSet{}
+				err := k8sClient.Get(ctx, client.ObjectKey{Name: nis.Name}, n)
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(n.Name).To(Equal(nis.Name))
 			}).Should(Succeed())
 		})
 	})

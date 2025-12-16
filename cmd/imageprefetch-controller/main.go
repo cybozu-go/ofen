@@ -151,7 +151,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	garbageCollector := controller.NewNodeImageSetGarbageCollector(
+	garbageCollector := controller.NewGarbageCollector(
 		mgr.GetClient(),
 		ctrl.Log.WithName("NodeImageSetGarbageCollector"),
 		config.nodeImageSetGCInterval,
