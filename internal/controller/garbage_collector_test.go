@@ -17,7 +17,7 @@ import (
 	"github.com/cybozu-go/ofen/internal/constants"
 )
 
-var _ = Describe("NodeImageSet Garbage Collector", func() {
+var _ = Describe("NodeImageSet Garbage Collector", Serial, func() {
 	Context("removeStaleNodeImageSets", func() {
 		var stopFunc func()
 		nodeName := "gc-test-node"
