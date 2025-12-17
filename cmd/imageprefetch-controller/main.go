@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"flag"
 	"os"
+	"time"
 
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
@@ -38,6 +39,7 @@ func init() {
 type Config struct {
 	imagePullNodeLimit                 int
 	maxConcurrentNodeImageSetCreations int
+	nodeImageSetGCInterval             time.Duration
 }
 
 func main() {
@@ -62,6 +64,8 @@ func main() {
 		"The maximum number of nodes that can pull images concurrently.")
 	flag.IntVar(&config.maxConcurrentNodeImageSetCreations, "max-concurrent-nodeimageset-creations", 1,
 		"The maximum number of NodeImageSets to create or update concurrently.")
+	flag.DurationVar(&config.nodeImageSetGCInterval, "nodeimageset-gc-interval", 1*time.Hour,
+		"The interval at which the NodeImageSet garbage collector runs.")
 	opts := zap.Options{
 		Development: true,
 	}
@@ -146,6 +150,18 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "ImagePrefetch")
 		os.Exit(1)
 	}
+
+	garbageCollector := controller.NewGarbageCollector(
+		mgr.GetClient(),
+		ctrl.Log.WithName("NodeImageSetGarbageCollector"),
+		config.nodeImageSetGCInterval,
+	)
+	err = mgr.Add(garbageCollector)
+	if err != nil {
+		setupLog.Error(err, "unable to add NodeImageSet garbage collector to manager")
+		os.Exit(1)
+	}
+
 	// +kubebuilder:scaffold:builder
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
