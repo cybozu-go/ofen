@@ -1,7 +1,7 @@
 package imgmanager
 
 import (
-	"log/slog"
+	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
 
@@ -15,23 +15,21 @@ type Task struct {
 	Secrets        *[]corev1.Secret
 }
 
-func (t Task) LogValue() slog.Value {
-	attrs := []slog.Attr{
-		slog.String("ref", t.Ref),
-		slog.String("registryPolicy", string(t.RegistryPolicy)),
-	}
-
+func (t Task) String() string {
+	secretNames := []string{}
 	if t.Secrets != nil {
-		var secretNames []string
 		for _, secret := range *t.Secrets {
 			secretNames = append(secretNames, secret.Name)
 		}
-		attrs = append(attrs, slog.Any("secrets", secretNames))
 	}
 
+	nodeImageSetName := ""
 	if t.NodeImageSet != nil {
-		attrs = append(attrs, slog.String("nodeImageSet", t.NodeImageSet.Name))
+		nodeImageSetName = t.NodeImageSet.Name
 	}
 
-	return slog.GroupValue(attrs...)
+	return fmt.Sprintf(
+		"ref=%s registryPolicy=%s secrets=%v nodeImageSet=%s",
+		t.Ref, t.RegistryPolicy, secretNames, nodeImageSetName,
+	)
 }
