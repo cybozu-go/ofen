@@ -169,13 +169,23 @@ func (r *NodeImageSetReconciler) updateStatus(ctx context.Context, nodeImageSet 
 	desiredImage := len(nodeImageSet.Spec.Images)
 	downloadedImage, failedImage := r.calculateImageStatus(ctx, nodeImageSet)
 
+	imgPrefetch := &ofenv1.ImagePrefetch{}
+	imgPrefetchNamespace := nodeImageSet.Labels[constants.OwnerImagePrefetchNamespace]
+	imgPrefetchName := nodeImageSet.Labels[constants.OwnerImagePrefetchName]
+	err := r.Get(ctx, types.NamespacedName{Namespace: imgPrefetchNamespace, Name: imgPrefetchName}, imgPrefetch)
+	if err != nil {
+		logger.Error(err, "failed to get owner ImagePrefetch", "namespace", imgPrefetchNamespace, "name", imgPrefetchName)
+		return ctrl.Result{}, err
+	}
+
 	nodeImageSetSSA := ofenv1apply.NodeImageSet(nodeImageSet.Name).
 		WithStatus(
 			ofenv1apply.NodeImageSetStatus().
 				WithDesiredImages(desiredImage).
 				WithAvailableImages(downloadedImage).
 				WithDownloadFailedImages(failedImage).
-				WithObservedGeneration(nodeImageSet.Generation),
+				WithObservedGeneration(nodeImageSet.Generation).
+				WithImagePrefetchGeneration(imgPrefetch.Generation),
 		)
 
 	for _, image := range nodeImageSet.Spec.Images {

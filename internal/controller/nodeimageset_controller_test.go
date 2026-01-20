@@ -109,10 +109,19 @@ var _ = Describe("NodeImageSet Controller", Serial, func() {
 			testName := "test-nodeimageset"
 			image := fmt.Sprintf("test/%s/image:latest", testName)
 
+			By("creating a ImagePrefetch resource")
+			createNamespace(ctx, testName)
+			imagePrefetch := createNewImagePrefetch(ctx, testName, ofenv1.ImagePrefetchSpec{
+				Images:   []string{image},
+				Replicas: 1,
+			})
+
 			By("creating a NodeImageSet resource")
 			nodeImageSet := createNodeImageSet(testName).
 				WithLabels(map[string]string{
-					constants.NodeName: nodeName,
+					constants.NodeName:                    nodeName,
+					constants.OwnerImagePrefetchName:      imagePrefetch.Name,
+					constants.OwnerImagePrefetchNamespace: imagePrefetch.Namespace,
 				}).
 				withNodeName(nodeName).
 				withImages([]string{image}).
@@ -139,10 +148,19 @@ var _ = Describe("NodeImageSet Controller", Serial, func() {
 			image2 := fmt.Sprintf("test/%s/image2:latest", testName)
 			fakeContainerdClient.SetPullDelay(3 * time.Second)
 
+			By("creating a ImagePrefetch resource")
+			createNamespace(ctx, testName)
+			imagePrefetch := createNewImagePrefetch(ctx, testName, ofenv1.ImagePrefetchSpec{
+				Images:   []string{image1, image2},
+				Replicas: 1,
+			})
+
 			By("creating a NodeImageSet resource with two images")
 			nodeImageSet := createNodeImageSet(testName).
 				WithLabels(map[string]string{
-					constants.NodeName: nodeName,
+					constants.NodeName:                    nodeName,
+					constants.OwnerImagePrefetchName:      imagePrefetch.Name,
+					constants.OwnerImagePrefetchNamespace: imagePrefetch.Namespace,
 				}).
 				withNodeName(nodeName).
 				withImages([]string{image1, image2}).
@@ -183,10 +201,19 @@ var _ = Describe("NodeImageSet Controller", Serial, func() {
 			testName := "no-reconcile-on-node-name-mismatch"
 			image := fmt.Sprintf("test/%s/image:latest", testName)
 
+			By("creating a ImagePrefetch resource")
+			createNamespace(ctx, testName)
+			imagePrefetch := createNewImagePrefetch(ctx, testName, ofenv1.ImagePrefetchSpec{
+				Images:   []string{image},
+				Replicas: 1,
+			})
+
 			By("creating a NodeImageSet resource for a different node")
 			nodeImageSet := createNodeImageSet(testName).
 				WithLabels(map[string]string{
-					constants.NodeName: "other-node",
+					constants.NodeName:                    "other-node",
+					constants.OwnerImagePrefetchName:      imagePrefetch.Name,
+					constants.OwnerImagePrefetchNamespace: imagePrefetch.Namespace,
 				}).
 				withNodeName("other-node").
 				withImages([]string{image}).
@@ -212,10 +239,20 @@ var _ = Describe("NodeImageSet Controller", Serial, func() {
 		It("should update NodeImageSet status based on the actual image availability on the node", func() {
 			testName := "update-status-on-node-status-change"
 			image := fmt.Sprintf("test/%s/image:latest", testName)
+
+			By("creating a ImagePrefetch resource")
+			createNamespace(ctx, testName)
+			imagePrefetch := createNewImagePrefetch(ctx, testName, ofenv1.ImagePrefetchSpec{
+				Images:   []string{image},
+				Replicas: 1,
+			})
+
 			By("creating a NodeImageSet resource with one image")
 			nodeImageSet := createNodeImageSet(testName).
 				WithLabels(map[string]string{
-					constants.NodeName: nodeName,
+					constants.NodeName:                    nodeName,
+					constants.OwnerImagePrefetchName:      imagePrefetch.Name,
+					constants.OwnerImagePrefetchNamespace: imagePrefetch.Namespace,
 				}).
 				withNodeName(nodeName).
 				withImages([]string{image}).
@@ -248,10 +285,19 @@ var _ = Describe("NodeImageSet Controller", Serial, func() {
 			image := fmt.Sprintf("test/%s/image:latest", testName)
 			fakeContainerdClient.RegisterImagePullError(image, errdefs.ErrUnavailable)
 
+			By("creating a ImagePrefetch resource")
+			createNamespace(ctx, testName)
+			imagePrefetch := createNewImagePrefetch(ctx, testName, ofenv1.ImagePrefetchSpec{
+				Images:   []string{image},
+				Replicas: 1,
+			})
+
 			By("creating a NodeImageSet resource with one image")
 			nodeImageSet := createNodeImageSet(testName).
 				WithLabels(map[string]string{
-					constants.NodeName: nodeName,
+					constants.NodeName:                    nodeName,
+					constants.OwnerImagePrefetchName:      imagePrefetch.Name,
+					constants.OwnerImagePrefetchNamespace: imagePrefetch.Namespace,
 				}).
 				withNodeName(nodeName).
 				withImages([]string{image}).
@@ -279,10 +325,19 @@ var _ = Describe("NodeImageSet Controller", Serial, func() {
 			image2 := fmt.Sprintf("test/%s/image2:not-found", testName)
 			fakeContainerdClient.RegisterImagePullError(image2, errdefs.ErrNotFound)
 
+			By("creating a ImagePrefetch resource")
+			createNamespace(ctx, testName)
+			imagePrefetch := createNewImagePrefetch(ctx, testName, ofenv1.ImagePrefetchSpec{
+				Images:   []string{image1, image2},
+				Replicas: 1,
+			})
+
 			By("creating a NodeImageSet resource with two images")
 			nodeImageSet := createNodeImageSet(testName).
 				WithLabels(map[string]string{
-					constants.NodeName: nodeName,
+					constants.NodeName:                    nodeName,
+					constants.OwnerImagePrefetchName:      imagePrefetch.Name,
+					constants.OwnerImagePrefetchNamespace: imagePrefetch.Namespace,
 				}).
 				withNodeName(nodeName).
 				withImages([]string{image1, image2}).
@@ -310,10 +365,19 @@ var _ = Describe("NodeImageSet Controller", Serial, func() {
 			image2 := fmt.Sprintf("test/%s/image2:not-found", testName)
 			fakeContainerdClient.RegisterImagePullError(image2, errdefs.ErrNotFound)
 
+			By("creating a ImagePrefetch resource")
+			createNamespace(ctx, testName)
+			imagePrefetch := createNewImagePrefetch(ctx, testName, ofenv1.ImagePrefetchSpec{
+				Images:   []string{image1, image2},
+				Replicas: 1,
+			})
+
 			By("creating a NodeImageSet resource with two images and MirrorOnly policy")
 			nodeImageSet := createNodeImageSet(testName).
 				WithLabels(map[string]string{
-					constants.NodeName: nodeName,
+					constants.NodeName:                    nodeName,
+					constants.OwnerImagePrefetchName:      imagePrefetch.Name,
+					constants.OwnerImagePrefetchNamespace: imagePrefetch.Namespace,
 				}).
 				withNodeName(nodeName).
 				withImages([]string{image1, image2}).

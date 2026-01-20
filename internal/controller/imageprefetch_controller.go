@@ -307,10 +307,6 @@ func (r *ImagePrefetchReconciler) createOrUpdateNodeImageSet(ctx context.Context
 				WithRegistryPolicy(registryPolicy).
 				WithNodeName(nodeName).
 				WithImagePullSecrets(imgPrefetch.Spec.ImagePullSecrets...),
-			).
-			WithStatus(
-				ofenv1apply.NodeImageSetStatus().
-					WithImagePrefetchGeneration(imgPrefetch.Generation),
 			)
 
 		if err := r.applyNodeImageSet(ctx, nodeImageSet, nodeImageSetName); err != nil {
@@ -551,7 +547,7 @@ func calculateStatus(selectNodes []string, nodeImageSets *ofenv1.NodeImageSetLis
 		}
 
 		if nodeImageSet.Status.Conditions == nil {
-			return status
+			continue
 		}
 
 		if meta.IsStatusConditionTrue(nodeImageSet.Status.Conditions, ofenv1.ConditionImageAvailable) {

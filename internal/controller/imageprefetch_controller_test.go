@@ -211,7 +211,7 @@ var _ = Describe("ImagePrefetch Controller", Serial, func() {
 				},
 			)
 
-			updateNodeImageSetStatusToImageAvailable(ctx, testName, replicas)
+			updateNodeImageSetStatusToImageAvailable(ctx, testName, replicas, imagePrefetch.Generation)
 
 			Eventually(func(g Gomega) {
 				nodeImageSets := &ofenv1.NodeImageSetList{}
@@ -267,7 +267,7 @@ var _ = Describe("ImagePrefetch Controller", Serial, func() {
 				},
 			)
 
-			updateNodeImageSetStatusToImageAvailable(ctx, testName, allNodesCount)
+			updateNodeImageSetStatusToImageAvailable(ctx, testName, allNodesCount, imagePrefetch.Generation)
 			Eventually(func(g Gomega) {
 				nodeImageSets := &ofenv1.NodeImageSetList{}
 				err := k8sClient.List(ctx, nodeImageSets, &client.ListOptions{
@@ -296,7 +296,7 @@ var _ = Describe("ImagePrefetch Controller", Serial, func() {
 				},
 			)
 
-			updateNodeImageSetStatusToImageAvailable(ctx, testName, allNodesCount)
+			updateNodeImageSetStatusToImageAvailable(ctx, testName, allNodesCount, imagePrefetch.Generation)
 
 			Eventually(func(g Gomega) {
 				nodeImageSets := &ofenv1.NodeImageSetList{}
@@ -323,7 +323,7 @@ var _ = Describe("ImagePrefetch Controller", Serial, func() {
 				Images:   testImagesList,
 				Replicas: replicas,
 			})
-			updateNodeImageSetStatusToImageAvailable(ctx, testName, replicas)
+			updateNodeImageSetStatusToImageAvailable(ctx, testName, replicas, imagePrefetch.Generation)
 
 			Eventually(func(g Gomega) {
 				nodeImageSets := &ofenv1.NodeImageSetList{}
@@ -367,7 +367,7 @@ var _ = Describe("ImagePrefetch Controller", Serial, func() {
 				},
 			})
 
-			updateNodeImageSetStatusToImageAvailable(ctx, testName, replicas)
+			updateNodeImageSetStatusToImageAvailable(ctx, testName, replicas, imagePrefetch.Generation)
 			Eventually(func(g Gomega) {
 				nodeImageSets := &ofenv1.NodeImageSetList{}
 				err := k8sClient.List(ctx, nodeImageSets, &client.ListOptions{
@@ -403,7 +403,7 @@ var _ = Describe("ImagePrefetch Controller", Serial, func() {
 				Replicas: replicas,
 			})
 
-			updateNodeImageSetStatusToImageAvailable(ctx, testName, replicas)
+			updateNodeImageSetStatusToImageAvailable(ctx, testName, replicas, imagePrefetch.Generation)
 			Eventually(func(g Gomega) {
 				nodeImageSets := &ofenv1.NodeImageSetList{}
 				err := k8sClient.List(ctx, nodeImageSets, &client.ListOptions{
@@ -481,6 +481,7 @@ var _ = Describe("ImagePrefetch Controller", Serial, func() {
 
 				for _, nodeImageSet := range nodeImageSets.Items {
 					nodeImageSet.Status.Conditions = []metav1.Condition{failedCondition}
+					nodeImageSet.Status.ImagePrefetchGeneration = imagePrefetch.Generation
 					err = k8sClient.Status().Update(ctx, &nodeImageSet)
 					g.Expect(err).NotTo(HaveOccurred())
 				}
@@ -556,7 +557,7 @@ var _ = Describe("ImagePrefetch Controller", Serial, func() {
 			testName := "increase-decrease-replicas"
 			createNamespace(ctx, testName)
 			replicas := 1
-			createNewImagePrefetch(ctx, testName, ofenv1.ImagePrefetchSpec{
+			imagePrefetch := createNewImagePrefetch(ctx, testName, ofenv1.ImagePrefetchSpec{
 				Images:   testImagesList,
 				Replicas: replicas,
 				ImagePullSecrets: []corev1.LocalObjectReference{
@@ -566,7 +567,7 @@ var _ = Describe("ImagePrefetch Controller", Serial, func() {
 				},
 			})
 
-			updateNodeImageSetStatusToImageAvailable(ctx, testName, replicas)
+			updateNodeImageSetStatusToImageAvailable(ctx, testName, replicas, imagePrefetch.Generation)
 			Eventually(func(g Gomega) {
 				nodeImageSets := &ofenv1.NodeImageSetList{}
 				err := k8sClient.List(ctx, nodeImageSets, &client.ListOptions{
@@ -583,14 +584,14 @@ var _ = Describe("ImagePrefetch Controller", Serial, func() {
 
 			By("updating the replicas of ImagePrefetch resource from 1 to 4")
 			replicas = 4 // 1 -> 4
-			imagePrefetch := &ofenv1.ImagePrefetch{}
+			imagePrefetch = &ofenv1.ImagePrefetch{}
 			err := k8sClient.Get(ctx, client.ObjectKey{Name: testName, Namespace: testName}, imagePrefetch)
 			Expect(err).NotTo(HaveOccurred())
 			imagePrefetch.Spec.Replicas = replicas
 			err = k8sClient.Update(ctx, imagePrefetch)
 			Expect(err).NotTo(HaveOccurred())
 
-			updateNodeImageSetStatusToImageAvailable(ctx, testName, replicas)
+			updateNodeImageSetStatusToImageAvailable(ctx, testName, replicas, imagePrefetch.Generation)
 			Eventually(func(g Gomega) {
 				nodeImageSets := &ofenv1.NodeImageSetList{}
 				err := k8sClient.List(ctx, nodeImageSets, &client.ListOptions{
@@ -614,7 +615,7 @@ var _ = Describe("ImagePrefetch Controller", Serial, func() {
 			err = k8sClient.Update(ctx, imagePrefetch)
 			Expect(err).NotTo(HaveOccurred())
 
-			updateNodeImageSetStatusToImageAvailable(ctx, testName, replicas)
+			updateNodeImageSetStatusToImageAvailable(ctx, testName, replicas, imagePrefetch.Generation)
 			Eventually(func(g Gomega) {
 				nodeImageSets := &ofenv1.NodeImageSetList{}
 				err := k8sClient.List(ctx, nodeImageSets, &client.ListOptions{
@@ -652,7 +653,7 @@ var _ = Describe("ImagePrefetch Controller", Serial, func() {
 				},
 			})
 
-			updateNodeImageSetStatusToImageAvailable(ctx, testName, replicas)
+			updateNodeImageSetStatusToImageAvailable(ctx, testName, replicas, imagePrefetch.Generation)
 			nodeImageSets := &ofenv1.NodeImageSetList{}
 			Eventually(func(g Gomega) {
 				err := k8sClient.List(ctx, nodeImageSets, &client.ListOptions{
@@ -710,7 +711,7 @@ var _ = Describe("ImagePrefetch Controller", Serial, func() {
 				},
 			)
 
-			updateNodeImageSetStatusToImageAvailable(ctx, testName, allNodesCount)
+			updateNodeImageSetStatusToImageAvailable(ctx, testName, allNodesCount, imagePrefetch.Generation)
 			Eventually(func(g Gomega) {
 				nodeImageSets := &ofenv1.NodeImageSetList{}
 				err := k8sClient.List(ctx, nodeImageSets, &client.ListOptions{
@@ -779,7 +780,7 @@ var _ = Describe("ImagePrefetch Controller", Serial, func() {
 				},
 			)
 
-			updateNodeImageSetStatusToImageAvailable(ctx, testName, replicas)
+			updateNodeImageSetStatusToImageAvailable(ctx, testName, replicas, imagePrefetch.Generation)
 			Eventually(func(g Gomega) {
 				nodeImageSets := &ofenv1.NodeImageSetList{}
 				err := k8sClient.List(ctx, nodeImageSets, &client.ListOptions{
@@ -869,7 +870,7 @@ var _ = Describe("ImagePrefetch Controller", Serial, func() {
 			)
 
 			By("checking that NotReady node is not included in NodeImageSets")
-			updateNodeImageSetStatusToImageAvailable(ctx, testName, 4)
+			updateNodeImageSetStatusToImageAvailable(ctx, testName, 4, imagePrefetch.Generation)
 			Eventually(func(g Gomega) {
 				nodeImageSets := &ofenv1.NodeImageSetList{}
 				err := k8sClient.List(ctx, nodeImageSets, &client.ListOptions{
@@ -915,7 +916,7 @@ var _ = Describe("ImagePrefetch Controller", Serial, func() {
 			}).Should(Succeed())
 
 			By("updating the first NodeImageSet status to image available")
-			updateNodeImageSetStatusToImageAvailable(ctx, testName, 1)
+			updateNodeImageSetStatusToImageAvailable(ctx, testName, 1, imagePrefetch.Generation)
 
 			By("checking that additional NodeImageSets are created after the first one completes")
 			Eventually(func(g Gomega) {
@@ -930,7 +931,7 @@ var _ = Describe("ImagePrefetch Controller", Serial, func() {
 			}).Should(Succeed())
 
 			By("updating the second NodeImageSet status to image available")
-			updateNodeImageSetStatusToImageAvailable(ctx, testName, 2)
+			updateNodeImageSetStatusToImageAvailable(ctx, testName, 2, imagePrefetch.Generation)
 
 			By("checking that the final NodeImageSet is created after the second one completes")
 			Eventually(func(g Gomega) {
@@ -954,12 +955,12 @@ var _ = Describe("ImagePrefetch Controller", Serial, func() {
 			replicas := 3
 			newImage := "extraimage:v3"
 			createNamespace(ctx, testName)
-			createNewImagePrefetch(ctx, testName, ofenv1.ImagePrefetchSpec{
+			imagePrefetch := createNewImagePrefetch(ctx, testName, ofenv1.ImagePrefetchSpec{
 				Images:   testImagesList,
 				Replicas: replicas,
 			})
 
-			updateNodeImageSetStatusToImageAvailable(ctx, testName, replicas)
+			updateNodeImageSetStatusToImageAvailable(ctx, testName, replicas, imagePrefetch.Generation)
 			Eventually(func(g Gomega) {
 				nodeImageSets := &ofenv1.NodeImageSetList{}
 				err := k8sClient.List(ctx, nodeImageSets, &client.ListOptions{
@@ -972,7 +973,7 @@ var _ = Describe("ImagePrefetch Controller", Serial, func() {
 			}).Should(Succeed())
 
 			By("updating ImagePrefetch spec to add image")
-			imagePrefetch := &ofenv1.ImagePrefetch{}
+			imagePrefetch = &ofenv1.ImagePrefetch{}
 			err := k8sClient.Get(ctx, client.ObjectKey{Name: testName, Namespace: testName}, imagePrefetch)
 			Expect(err).NotTo(HaveOccurred())
 
@@ -1014,6 +1015,7 @@ var _ = Describe("ImagePrefetch Controller", Serial, func() {
 				err = k8sClient.Get(ctx, client.ObjectKey{Name: newGenerationNodeImageSetName, Namespace: testName}, nodeImageSet)
 				g.Expect(err).NotTo(HaveOccurred())
 
+				nodeImageSet.Status.ImagePrefetchGeneration = imagePrefetch.Generation
 				nodeImageSet.Status.Conditions = []metav1.Condition{
 					{
 						Type:               ofenv1.ConditionImageAvailable,
@@ -1136,7 +1138,7 @@ func countRegistryPolicy(nodeImageSets *ofenv1.NodeImageSetList) (int, int) {
 	return defaultPolicy, mirrorOnly
 }
 
-func updateNodeImageSetStatusToImageAvailable(ctx context.Context, namespace string, desired int) {
+func updateNodeImageSetStatusToImageAvailable(ctx context.Context, namespace string, desired int, imagePrefetchGeneration int64) {
 	imageAvailableCondition := metav1.Condition{
 		Type:               ofenv1.ConditionImageAvailable,
 		Reason:             "test",
@@ -1157,6 +1159,7 @@ func updateNodeImageSetStatusToImageAvailable(ctx context.Context, namespace str
 
 		count := 0
 		for _, nodeImageSet := range nodeImageSets.Items {
+			nodeImageSet.Status.ImagePrefetchGeneration = imagePrefetchGeneration
 			nodeImageSet.Status.Conditions = []metav1.Condition{imageAvailableCondition}
 			var containerImageStatuses []ofenv1.ContainerImageStatus
 			for _, image := range nodeImageSet.Spec.Images {
