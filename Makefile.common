@@ -1,0 +1,3 @@
+IMG_TAG ?= dev
+IMG_PREFETCH_CONTROLLER ?= imageprefetch-controller:$(IMG_TAG)
+IMG_NODEIMAGESET_CONTROLLER ?= nodeimageset-controller:$(IMG_TAG)

@@ -14,7 +14,19 @@ spec:
     singular: imageprefetch
   scope: Namespaced
   versions:
-  - name: v1
+  - additionalPrinterColumns:
+    - description: The number of nodes that should have the images pre-downloaded
+      jsonPath: .status.desiredNodes
+      name: DesiredNodes
+      type: integer
+    - description: The number of nodes that have successfully pre-downloaded the images
+      jsonPath: .status.imagePulledNodes
+      name: ImagePulledNodes
+      type: integer
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1
     schema:
       openAPIV3Schema:
         description: ImagePrefetch is the Schema for the imageprefetches API
@@ -37,27 +49,99 @@ spec:
           metadata:
             type: object
           spec:
-            description: spec defines the desired state of ImagePrefetch
+            description: ImagePrefetchSpec defines the desired state of ImagePrefetch
             properties:
-              foo:
-                description: foo is an example field of ImagePrefetch. Edit imageprefetch_types.go
-                  to remove/update
-                type: string
+              allNodes:
+                default: false
+                description: AllNodes indicates whether the images should be pre-downloaded
+                  to all nodes filtered by the NodeSelector in the cluster
+                type: boolean
+              imagePullSecrets:
+                description: ImagePullSecrets is a list of secret names that contain
+                  credentials for authenticating with container registries
+                items:
+                  description: |-
+                    LocalObjectReference contains enough information to let you locate the
+                    referenced object inside the same namespace.
+                  properties:
+                    name:
+                      default: ""
+                      description: |-
+                        Name of the referent.
+                        This field is effectively required, but due to backwards compatibility is
+                        allowed to be empty. Instances of this type with an empty value here are
+                        almost certainly wrong.
+                        More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                      type: string
+                  type: object
+                  x-kubernetes-map-type: atomic
+                type: array
+              images:
+                description: Images is a list of container images that will be pre-downloaded
+                  to the target nodes
+                items:
+                  type: string
+                type: array
+              nodeSelector:
+                description: NodeSelector is a map of key-value pairs that specify
+                  which nodes should have the images pre-downloaded
+                properties:
+                  matchExpressions:
+                    description: matchExpressions is a list of label selector requirements.
+                      The requirements are ANDed.
+                    items:
+                      description: |-
+                        A label selector requirement is a selector that contains values, a key, and an operator that
+                        relates the key and values.
+                      properties:
+                        key:
+                          description: key is the label key that the selector applies
+                            to.
+                          type: string
+                        operator:
+                          description: |-
+                            operator represents a key's relationship to a set of values.
+                            Valid operators are In, NotIn, Exists and DoesNotExist.
+                          type: string
+                        values:
+                          description: |-
+                            values is an array of string values. If the operator is In or NotIn,
+                            the values array must be non-empty. If the operator is Exists or DoesNotExist,
+                            the values array must be empty. This array is replaced during a strategic
+                            merge patch.
+                          items:
+                            type: string
+                          type: array
+                          x-kubernetes-list-type: atomic
+                      required:
+                      - key
+                      - operator
+                      type: object
+                    type: array
+                    x-kubernetes-list-type: atomic
+                  matchLabels:
+                    additionalProperties:
+                      type: string
+                    description: |-
+                      matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
+                      map is equivalent to an element of matchExpressions, whose key field is "key", the
+                      operator is "In", and the values array contains only "value". The requirements are ANDed.
+                    type: object
+                type: object
+                x-kubernetes-map-type: atomic
+              replicas:
+                description: Replicas is the number of nodes that should download
+                  the specified images
+                type: integer
+            required:
+            - images
             type: object
           status:
-            description: status defines the observed state of ImagePrefetch
+            description: ImagePrefetchStatus defines the observed state of ImagePrefetch
             properties:
               conditions:
-                description: |-
-                  conditions represent the current state of the ImagePrefetch resource.
-                  Each condition has a unique type and reflects the status of a specific aspect of the resource.
-
-                  Standard condition types include:
-                  - "Available": the resource is fully functional
-                  - "Progressing": the resource is being created or updated
-                  - "Degraded": the resource failed to reach or maintain its desired state
-
-                  The status of each condition is one of True, False, or Unknown.
+                description: Conditions represent the latest available observations
+                  of an object's state
                 items:
                   description: Condition contains details for one aspect of the current
                     state of this API Resource.
@@ -116,9 +200,37 @@ spec:
                 x-kubernetes-list-map-keys:
                 - type
                 x-kubernetes-list-type: map
+              desiredNodes:
+                default: 0
+                description: DesiredNodes represents the number of nodes that should
+                  have the images pre-downloaded
+                type: integer
+              imagePullFailedNodes:
+                default: 0
+                description: ImagePullFailedNodes represents the number of nodes that
+                  failed to download the images
+                type: integer
+              imagePulledNodes:
+                default: 0
+                description: ImagePulledNodes represents the number of nodes that
+                  have successfully pre-downloaded the images
+                type: integer
+              imagePullingNodes:
+                default: 0
+                description: ImagePullingNodes represents the number of nodes that
+                  are currently downloading the images
+                type: integer
+              observedGeneration:
+                description: The generation observed by the controller.
+                format: int64
+                type: integer
+              selectedNodes:
+                description: SelectedNodes represents the nodes that have been selected
+                  to download the images
+                items:
+                  type: string
+                type: array
             type: object
-        required:
-        - spec
         type: object
     served: true
     storage: true

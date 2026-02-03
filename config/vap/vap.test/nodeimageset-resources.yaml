@@ -1,0 +1,73 @@
+apiVersion: ofen.cybozu.io/v1
+kind: NodeImageSet
+metadata:
+  name: valid-nodeimageset
+spec:
+  images:
+  - ghcr.io/cybozu/ubuntu:24.04
+  nodeName: "node1"
+  registryPolicy: "Default"
+  imagePullSecrets:
+  - name: "pull-secret1"
+---
+apiVersion: ofen.cybozu.io/v1
+kind: NodeImageSet
+metadata:
+  name: invalid-image-nodeimageset
+spec:
+  images: []
+  nodeName: "node1"
+  registryPolicy: "Default"
+---
+apiVersion: ofen.cybozu.io/v1
+kind: NodeImageSet
+metadata:
+  name: invalid-nodename-nodeimageset
+spec:
+  images:
+  - ghcr.io/cybozu/ubuntu:24.04
+  nodeName: ""
+  registryPolicy: "Default"
+---
+apiVersion: ofen.cybozu.io/v1
+kind: NodeImageSet
+metadata:
+  name: invalid-registrypolicy-nodeimageset
+spec:
+  images:
+  - ghcr.io/cybozu/ubuntu:24.04
+  nodeName: "node1"
+  registryPolicy: "InvalidPolicy"
+---
+apiVersion: ofen.cybozu.io/v1
+kind: NodeImageSet
+metadata:
+  name: invalid-image-pull-secrets-nodeimageset
+spec:
+  images:
+  - ghcr.io/cybozu/ubuntu:24.04
+  nodeName: "node1"
+  registryPolicy: "Default"
+  imagePullSecrets: []
+---
+apiVersion: ofen.cybozu.io/v1
+kind: NodeImageSet
+metadata:
+  name: invalid-registry-nodeimageset
+spec:
+  images:
+  - registry.invalid/not-permitted:latest
+  nodeName: "node1"
+  registryPolicy: "Default"
+---
+apiVersion: ofen.cybozu.io/v1
+kind: NodeImageSet
+metadata:
+  name: valid-mirroronly-nodeimageset
+spec:
+  images:
+  - ghcr.io/cybozu/ubuntu:24.04
+  nodeName: "node1"
+  registryPolicy: "MirrorOnly"
+  imagePullSecrets:
+  - name: "pull-secret1"
