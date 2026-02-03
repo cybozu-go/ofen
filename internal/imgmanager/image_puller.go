@@ -329,7 +329,7 @@ func (p *ImagePuller) SubscribeDeleteEvent(ctx context.Context) (<-chan string, 
 				}
 				if deleteImageName != "" {
 					p.logger.Info("processed image deletion event", "imageName", deleteImageName)
-					p.status.Range(func(key, value interface{}) bool {
+					p.status.Range(func(key, value any) bool {
 						nodeStatus := value.(*NodeImageSetStatus)
 						if value, ok := nodeStatus.Images.Load(deleteImageName); ok {
 							imageStatus := value.(*ImagePullStatus)

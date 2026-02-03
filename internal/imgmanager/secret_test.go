@@ -2,6 +2,7 @@ package imgmanager
 
 import (
 	"encoding/base64"
+	"maps"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -334,9 +335,7 @@ func TestProcessDockerConfigJSON(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			tokens := make(map[string]Credentials)
-			for k, v := range tt.initialTokens {
-				tokens[k] = v
-			}
+			maps.Copy(tokens, tt.initialTokens)
 
 			err := processDockerConfigJSON(tt.data, tokens)
 			if tt.expectError {
@@ -399,9 +398,7 @@ func TestProcessDockerCfg(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			tokens := make(map[string]Credentials)
-			for k, v := range tt.initialTokens {
-				tokens[k] = v
-			}
+			maps.Copy(tokens, tt.initialTokens)
 
 			err := processDockerCfg(tt.data, tokens)
 			if tt.expectError {
@@ -508,9 +505,7 @@ func TestExtractCredentials(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			tokens := make(map[string]Credentials)
-			for k, v := range tt.initialTokens {
-				tokens[k] = v
-			}
+			maps.Copy(tokens, tt.initialTokens)
 
 			err := extractCredentials(tt.registry, tt.authString, tokens)
 			if tt.expectError {

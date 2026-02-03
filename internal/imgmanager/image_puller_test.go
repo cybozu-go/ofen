@@ -32,7 +32,7 @@ func TestImagePullStatusConcurrentAccess(t *testing.T) {
 
 	// Test concurrent access to ImagePullStatus methods
 	wg.Add(numGoroutines)
-	for i := 0; i < numGoroutines; i++ {
+	for i := range numGoroutines {
 		go func(id int) {
 			defer wg.Done()
 
@@ -122,7 +122,7 @@ func TestNodeImageSetStatusConcurrentAccess(t *testing.T) {
 
 	// Test concurrent access to NodeImageSetStatus methods
 	wg.Add(numGoroutines)
-	for i := 0; i < numGoroutines; i++ {
+	for i := range numGoroutines {
 		go func(id int) {
 			defer wg.Done()
 
@@ -143,7 +143,7 @@ func TestNodeImageSetStatusConcurrentAccess(t *testing.T) {
 
 	// Verify that we have the expected number of unique images by counting
 	imageCount := 0
-	nodeStatus.Images.Range(func(key, value interface{}) bool {
+	nodeStatus.Images.Range(func(key, value any) bool {
 		imageCount++
 		return true
 	})
@@ -639,7 +639,7 @@ func TestImagePullerUpdateNodeImageSetStatus(t *testing.T) {
 		numGoroutines := 10
 
 		wg.Add(numGoroutines)
-		for i := 0; i < numGoroutines; i++ {
+		for i := range numGoroutines {
 			go func(id int) {
 				defer wg.Done()
 				images := []string{fmt.Sprintf("image%d:latest", id)}

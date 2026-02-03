@@ -199,8 +199,8 @@ func getNodeNames(nodes []corev1.Node) []string {
 }
 
 func selectNodesByReplicas(imgPrefetch *ofenv1.ImagePrefetch, readyNodes []corev1.Node) ([]string, error) {
-	var selectNodes []corev1.Node
 	targetReplicas := imgPrefetch.Spec.Replicas
+	selectNodes := make([]corev1.Node, 0, targetReplicas)
 
 	if len(readyNodes) < targetReplicas {
 		return nil, fmt.Errorf("not enough nodes available: %d < %d", len(readyNodes), targetReplicas)
@@ -221,7 +221,7 @@ func selectNodesByReplicas(imgPrefetch *ofenv1.ImagePrefetch, readyNodes []corev
 		}
 	}
 
-	for i := 0; i < len(readyNodes); i++ {
+	for range readyNodes {
 		if len(selectNodes) >= targetReplicas {
 			return getNodeNames(selectNodes), nil
 		}

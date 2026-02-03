@@ -34,7 +34,7 @@ var testImagesList = []string{"foobar:123", "foobar:456"}
 
 func prepareObjects(ctx context.Context) error {
 	// create 4 nodes with labels
-	for i := 0; i < 4; i++ {
+	for i := range 4 {
 		node := &corev1.Node{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: fmt.Sprintf("%s-%d", nodePrefix, i),
