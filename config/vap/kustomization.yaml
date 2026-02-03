@@ -1,0 +1,4 @@
+resources:
+  - configmap.yaml
+  - vap.yaml
+  - vap_binding.yaml
