@@ -1,84 +1,47 @@
+/*
+Copyright 2026.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 package v1
 
 import (
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// ImagePrefetchSpec defines the desired state of ImagePrefetch
+// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
+// NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
+
+// ImagePrefetchSpec defines the desired state of ImagePrefetch.
 type ImagePrefetchSpec struct {
-	// Images is a list of container images that will be pre-downloaded to the target nodes
-	Images []string `json:"images"`
+	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
+	// Important: Run "make" to regenerate code after modifying this file
 
-	// NodeSelector is a map of key-value pairs that specify which nodes should have the images pre-downloaded
-	// +optional
-	NodeSelector metav1.LabelSelector `json:"nodeSelector,omitempty"`
-
-	// AllNodes indicates whether the images should be pre-downloaded to all nodes filtered by the NodeSelector in the cluster
-	// +optional
-	// +kubebuilder:default=false
-	AllNodes bool `json:"allNodes,omitempty"`
-
-	// Replicas is the number of nodes that should download the specified images
-	// +optional
-	Replicas int `json:"replicas,omitempty"`
-
-	// ImagePullSecrets is a list of secret names that contain credentials for authenticating with container registries
-	// +optional
-	ImagePullSecrets []corev1.LocalObjectReference `json:"imagePullSecrets,omitempty"`
+	// Foo is an example field of ImagePrefetch. Edit imageprefetch_types.go to remove/update
+	Foo string `json:"foo,omitempty"`
 }
 
-// ImagePrefetchStatus defines the observed state of ImagePrefetch
+// ImagePrefetchStatus defines the observed state of ImagePrefetch.
 type ImagePrefetchStatus struct {
-	// The generation observed by the controller.
-	// +optional
-	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
-
-	// Conditions represent the latest available observations of an object's state
-	// +listType=map
-	// +listMapKey=type
-	// +optional
-	Conditions []metav1.Condition `json:"conditions,omitempty"`
-
-	// DesiredNodes represents the number of nodes that should have the images pre-downloaded
-	// +optional
-	// +kubebuilder:default:=0
-	DesiredNodes int `json:"desiredNodes,omitempty"`
-
-	// ImagePulledNodes represents the number of nodes that have successfully pre-downloaded the images
-	// +optional
-	// +kubebuilder:default:=0
-	ImagePulledNodes int `json:"imagePulledNodes,omitempty"`
-
-	// ImagePullingNodes represents the number of nodes that are currently downloading the images
-	// +optional
-	// +kubebuilder:default:=0
-	ImagePullingNodes int `json:"imagePullingNodes,omitempty"`
-
-	// ImagePullFailedNodes represents the number of nodes that failed to download the images
-	// +optional
-	// +kubebuilder:default:=0
-	ImagePullFailedNodes int `json:"imagePullFailedNodes,omitempty"`
-
-	// SelectedNodes represents the nodes that have been selected to download the images
-	// +optional
-	SelectedNodes []string `json:"selectedNodes,omitempty"`
+	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
+	// Important: Run "make" to regenerate code after modifying this file
 }
 
-const (
-	ConditionReady                = "Ready"
-	ConditionNodeImageSetsCreated = "NodeImageSetsCreated"
-	ConditionNoImagePullFailed    = "NoImagePullFailed"
-)
-
-// +genclient
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-// +kubebuilder:printcolumn:name="DesiredNodes",type="integer",JSONPath=".status.desiredNodes",description="The number of nodes that should have the images pre-downloaded"
-// +kubebuilder:printcolumn:name="ImagePulledNodes",type="integer",JSONPath=".status.imagePulledNodes",description="The number of nodes that have successfully pre-downloaded the images"
-// +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 
-// ImagePrefetch is the Schema for the imageprefetches API
+// ImagePrefetch is the Schema for the imageprefetches API.
 type ImagePrefetch struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -89,7 +52,7 @@ type ImagePrefetch struct {
 
 // +kubebuilder:object:root=true
 
-// ImagePrefetchList contains a list of ImagePrefetch
+// ImagePrefetchList contains a list of ImagePrefetch.
 type ImagePrefetchList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`

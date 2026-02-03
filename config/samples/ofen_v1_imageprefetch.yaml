@@ -6,6 +6,4 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
   name: imageprefetch-sample
 spec:
-  images:
-    - ghcr.io/cybozu/ubuntu:24.04
-  replicas: 2
+  # TODO(user): Add fields here

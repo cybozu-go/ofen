@@ -1,4 +1,0 @@
-owner: cybozu-go
-git-repo: ofen
-release-name-template: "{{ .Name }}-chart-{{ .Version }}"
-release-notes-file: RELEASE.md

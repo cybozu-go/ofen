@@ -1,5 +1,5 @@
-include ./Makefile.common
-ENVTEST_K8S_VERSION = 1.34.1
+# Image URL to use all building/pushing image targets
+IMG ?= controller:latest
 
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
@@ -8,50 +8,46 @@ else
 GOBIN=$(shell go env GOBIN)
 endif
 
+# CONTAINER_TOOL defines the container tool to be used for building images.
+# Be aware that the target commands are only tested with Docker which is
+# scaffolded by default. However, you might want to replace it to use other
+# tools. (i.e. podman)
 CONTAINER_TOOL ?= docker
 
+# Setting SHELL to bash allows bash commands to be executed by recipes.
+# Options are set to exit when a recipe line exits non-zero or a piped command fails.
 SHELL = /usr/bin/env bash -o pipefail
 .SHELLFLAGS = -ec
 
 .PHONY: all
 all: build
 
+##@ General
+
+# The help target prints out all targets with their descriptions organized
+# beneath their categories. The categories are represented by '##@' and the
+# target descriptions by '##'. The awk command is responsible for reading the
+# entire set of makefiles included in this invocation, looking for lines of the
+# file as xyz: ## something, and then pretty-format the target and help. Then,
+# if there's a line with ##@ something, that gets pretty-printed as a category.
+# More info on the usage of ANSI control characters for terminal formatting:
+# https://en.wikipedia.org/wiki/ANSI_escape_code#SGR_parameters
+# More info on the awk command:
+# http://linuxcommand.org/lc3_adv_awk.php
+
 .PHONY: help
 help: ## Display this help.
 	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z_0-9-]+:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
 
+##@ Development
+
 .PHONY: manifests
-manifests: controller-gen kustomize yq ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
-	$(CONTROLLER_GEN) rbac:roleName=controller-manager-role crd paths="./..." output:crd:artifacts:config=config/crd/bases
-	echo '{{- if .Values.crds.enabled }}' > charts/ofen/templates/generated/crds/crds.yaml	
-	$(KUSTOMIZE) build config/kustomize-to-helm/overlays/crds | $(YQ) e "." - >> charts/ofen/templates/generated/crds/crds.yaml
-	echo '{{- end }}' >> charts/ofen/templates/generated/crds/crds.yaml
-	kustomize build config/kustomize-to-helm/overlays/templates | yq e "."  -p yaml - > charts/ofen/templates/generated/generated.yaml
+manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
+	$(CONTROLLER_GEN) rbac:roleName=manager-role crd webhook paths="./..." output:crd:artifacts:config=config/crd/bases
 
 .PHONY: generate
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
-	
-.PHONY: check-generate
-check-generate:
-	$(MAKE) manifests generate k8s-client-gen
-	git diff --exit-code --name-only
-
-# refer to https://github.com/statnett/image-scanner-operator/pull/668/files
-GO_MODULE = $(shell go list -m)
-API_DIRS = $(shell find api -mindepth 1 -type d | sed "s|^|$(shell go list -m)/|" | paste -sd " " )
-.PHONY: k8s-client-gen
-k8s-client-gen: applyconfiguration-gen models-schema
-	@echo "generating"
-	$(MODELS_SCHEMA) > /tmp/schema.json
-	rm -rf internal/client/applyconfigurations
-	$(APPLYCONFIGURATION_GEN) \
-        --go-header-file hack/boilerplate.go.txt \
-		--output-dir internal/applyconfigurations \
-		--output-pkg $(GO_MODULE)/internal/applyconfigurations \
-		--openapi-schema /tmp/schema.json \
-		$(API_DIRS)
-	rm -f /tmp/schema.json
 
 .PHONY: fmt
 fmt: ## Run go fmt against code.
@@ -62,13 +58,23 @@ vet: ## Run go vet against code.
 	go vet ./...
 
 .PHONY: test
-test: manifests generate fmt vet envtest ginkgo kaptest ## Run tests.
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" $(GINKGO) run --skip-file e2e.* -r --coverprofile cover.out -v
-	$(KAPTEST) run config/vap/vap.test/kaptest.yaml
+test: manifests generate fmt vet setup-envtest ## Run tests.
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test $$(go list ./... | grep -v /e2e) -coverprofile cover.out
 
-# Utilize Kind or modify the e2e tests to load the image locally, enabling compatibility with other vendors.
-.PHONY: test-e2e  # Run the e2e tests against a Kind k8s instance that is spun up.
-test-e2e:
+# TODO(user): To use a different vendor for e2e tests, modify the setup under 'tests/e2e'.
+# The default setup assumes Kind is pre-installed and builds/loads the Manager Docker image locally.
+# CertManager is installed by default; skip with:
+# - CERT_MANAGER_INSTALL_SKIP=true
+.PHONY: test-e2e
+test-e2e: manifests generate fmt vet ## Run the e2e tests. Expected an isolated environment using Kind.
+	@command -v kind >/dev/null 2>&1 || { \
+		echo "Kind is not installed. Please install Kind manually."; \
+		exit 1; \
+	}
+	@kind get clusters | grep -q 'kind' || { \
+		echo "No Kind cluster is running. Please start a Kind cluster before running the e2e tests."; \
+		exit 1; \
+	}
 	go test ./test/e2e/ -v -ginkgo.v
 
 .PHONY: lint
@@ -79,28 +85,52 @@ lint: golangci-lint ## Run golangci-lint linter
 lint-fix: golangci-lint ## Run golangci-lint linter and perform fixes
 	$(GOLANGCI_LINT) run --fix
 
+.PHONY: lint-config
+lint-config: golangci-lint ## Verify golangci-lint linter configuration
+	$(GOLANGCI_LINT) config verify
+
+##@ Build
+
 .PHONY: build
-build: manifests generate fmt vet k8s-client-gen ## Build manager binary.
-	go build -o bin/imageprefetch-controller cmd/imageprefetch-controller/main.go
-	go build -o bin/nodeimageset-controller cmd/nodeimageset-controller/main.go
+build: manifests generate fmt vet ## Build manager binary.
+	go build -o bin/manager cmd/main.go
 
 .PHONY: run
 run: manifests generate fmt vet ## Run a controller from your host.
 	go run ./cmd/main.go
 
+# If you wish to build the manager image targeting other platforms you can use the --platform flag.
+# (i.e. docker build --platform linux/arm64). However, you must enable docker buildKit for it.
+# More info: https://docs.docker.com/develop/develop-images/build_enhancements/
 .PHONY: docker-build
 docker-build: ## Build docker image with the manager.
-	$(CONTAINER_TOOL) build -t ${IMG_PREFETCH_CONTROLLER} -f ./dockerfiles/Dockerfile.imageprefetch-controller .
-	$(CONTAINER_TOOL) build -t $(IMG_NODEIMAGESET_CONTROLLER) -f ./dockerfiles/Dockerfile.nodeimageset-controller .
+	$(CONTAINER_TOOL) build -t ${IMG} .
 
 .PHONY: docker-push
 docker-push: ## Push docker image with the manager.
-	$(CONTAINER_TOOL) push ${IMG_PREFETCH_CONTROLLER}
-	$(CONTAINER_TOOL) push ${IMG_NODEIMAGESET_CONTROLLER}
+	$(CONTAINER_TOOL) push ${IMG}
+
+# PLATFORMS defines the target platforms for the manager image be built to provide support to multiple
+# architectures. (i.e. make docker-buildx IMG=myregistry/mypoperator:0.0.1). To use this option you need to:
+# - be able to use docker buildx. More info: https://docs.docker.com/build/buildx/
+# - have enabled BuildKit. More info: https://docs.docker.com/develop/develop-images/build_enhancements/
+# - be able to push the image to your registry (i.e. if you do not set a valid value via IMG=<myregistry/image:<tag>> then the export will fail)
+# To adequately provide solutions that are compatible with multiple platforms, you should consider using this option.
+PLATFORMS ?= linux/arm64,linux/amd64,linux/s390x,linux/ppc64le
+.PHONY: docker-buildx
+docker-buildx: ## Build and push docker image for the manager for cross-platform support
+	# copy existing Dockerfile and insert --platform=${BUILDPLATFORM} into Dockerfile.cross, and preserve the original Dockerfile
+	sed -e '1 s/\(^FROM\)/FROM --platform=\$$\{BUILDPLATFORM\}/; t' -e ' 1,// s//FROM --platform=\$$\{BUILDPLATFORM\}/' Dockerfile > Dockerfile.cross
+	- $(CONTAINER_TOOL) buildx create --name ofen-builder
+	$(CONTAINER_TOOL) buildx use ofen-builder
+	- $(CONTAINER_TOOL) buildx build --push --platform=$(PLATFORMS) --tag ${IMG} -f Dockerfile.cross .
+	- $(CONTAINER_TOOL) buildx rm ofen-builder
+	rm Dockerfile.cross
 
 .PHONY: build-installer
 build-installer: manifests generate kustomize ## Generate a consolidated YAML with CRDs and deployment.
 	mkdir -p dist
+	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
 	$(KUSTOMIZE) build config/default > dist/install.yaml
 
 ##@ Deployment
@@ -119,6 +149,7 @@ uninstall: manifests kustomize ## Uninstall CRDs from the K8s cluster specified 
 
 .PHONY: deploy
 deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in ~/.kube/config.
+	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
 	$(KUSTOMIZE) build config/default | $(KUBECTL) apply -f -
 
 .PHONY: undeploy
@@ -138,22 +169,15 @@ KUSTOMIZE ?= $(LOCALBIN)/kustomize
 CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
 ENVTEST ?= $(LOCALBIN)/setup-envtest
 GOLANGCI_LINT = $(LOCALBIN)/golangci-lint
-GINKGO = $(LOCALBIN)/ginkgo
-APPLYCONFIGURATION_GEN = $(LOCALBIN)/applyconfiguration-gen
-MODELS_SCHEMA = $(LOCALBIN)/models-schema
-KAPTEST ?= $(LOCALBIN)/kaptest
-YQ ?= $(LOCALBIN)/yq
 
 ## Tool Versions
-KUSTOMIZE_VERSION ?= v5.8.0
-CONTROLLER_TOOLS_VERSION ?= v0.19.0
-ENVTEST_VERSION ?= release-0.22
-GOLANGCI_LINT_VERSION ?= 2.6.2
-GINKGO_VERSION ?= v2.27.2
-CODE_GENERATOR_VERSION ?= v0.34.2
-MODELS_SCHEMA_VERSION ?= v1.34.2
-KAPTEST_VERSION ?= v0.1.2
-YQ_VERSION ?= v4.48.2
+KUSTOMIZE_VERSION ?= v5.5.0
+CONTROLLER_TOOLS_VERSION ?= v0.17.2
+#ENVTEST_VERSION is the version of controller-runtime release branch to fetch the envtest setup script (i.e. release-0.20)
+ENVTEST_VERSION ?= $(shell go list -m -f "{{ .Version }}" sigs.k8s.io/controller-runtime | awk -F'[v.]' '{printf "release-%d.%d", $$2, $$3}')
+#ENVTEST_K8S_VERSION is the version of Kubernetes to use for setting up ENVTEST binaries (i.e. 1.31)
+ENVTEST_K8S_VERSION ?= $(shell go list -m -f "{{ .Version }}" k8s.io/api | awk -F'[v.]' '{printf "1.%d", $$3}')
+GOLANGCI_LINT_VERSION ?= v1.63.4
 
 .PHONY: kustomize
 kustomize: $(KUSTOMIZE) ## Download kustomize locally if necessary.
@@ -165,6 +189,14 @@ controller-gen: $(CONTROLLER_GEN) ## Download controller-gen locally if necessar
 $(CONTROLLER_GEN): $(LOCALBIN)
 	$(call go-install-tool,$(CONTROLLER_GEN),sigs.k8s.io/controller-tools/cmd/controller-gen,$(CONTROLLER_TOOLS_VERSION))
 
+.PHONY: setup-envtest
+setup-envtest: envtest ## Download the binaries required for ENVTEST in the local bin directory.
+	@echo "Setting up envtest binaries for Kubernetes version $(ENVTEST_K8S_VERSION)..."
+	@$(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path || { \
+		echo "Error: Failed to set up envtest binaries for version $(ENVTEST_K8S_VERSION)."; \
+		exit 1; \
+	}
+
 .PHONY: envtest
 envtest: $(ENVTEST) ## Download setup-envtest locally if necessary.
 $(ENVTEST): $(LOCALBIN)
@@ -173,45 +205,7 @@ $(ENVTEST): $(LOCALBIN)
 .PHONY: golangci-lint
 golangci-lint: $(GOLANGCI_LINT) ## Download golangci-lint locally if necessary.
 $(GOLANGCI_LINT): $(LOCALBIN)
-	curl -sLO "https://github.com/golangci/golangci-lint/releases/download/v$(GOLANGCI_LINT_VERSION)/golangci-lint-$(GOLANGCI_LINT_VERSION)-linux-amd64.tar.gz" && \
-	tar -xzf golangci-lint-$(GOLANGCI_LINT_VERSION)-linux-amd64.tar.gz --strip-components=1 -C $(LOCALBIN)  golangci-lint-$(GOLANGCI_LINT_VERSION)-linux-amd64/golangci-lint && \
-	rm -f golangci-lint-$(GOLANGCI_LINT_VERSION)-linux-amd64.tar.gz
-
-.PHONY: ginkgo
-ginkgo: $(GINKGO) ## Download ginkgo locally if necessary.
-$(GINKGO): $(LOCALBIN)
-	$(call go-install-tool,$(GINKGO),github.com/onsi/ginkgo/v2/ginkgo,$(GINKGO_VERSION))
-
-.PHONY: models-schema
-models-schema: $(LOCALBIN) ## Download models-schema locally if necessary.
-	test -s $(LOCALBIN)/models-schema || \
-	( \
-		mkdir -p /tmp/work-models-schema/pkg/generated/openapi/cmd/models-schema && \
-		curl -sSfL https://github.com/kubernetes/kubernetes/archive/$(MODELS_SCHEMA_VERSION).tar.gz | tar -C /tmp/work-models-schema -xzf - --strip-components=1 &&\
-		cd /tmp/work-models-schema/pkg/generated/openapi/cmd/models-schema &&\
-		GOBIN=$(LOCALBIN) go install \
-	)
-
-.PHONY: applyconfiguration-gen
-applyconfiguration-gen: $(APPLYCONFIGURATION_GEN) ## Download applyconfiguration-gen locally if necessary.
-$(APPLYCONFIGURATION_GEN): $(LOCALBIN)
-	$(call go-install-tool,$(APPLYCONFIGURATION_GEN),k8s.io/code-generator/cmd/applyconfiguration-gen,$(CODE_GENERATOR_VERSION))
-
-.PHONY: kaptest
-kaptest: $(KAPTEST) ## Download kaptest locally if necessary.
-$(KAPTEST): $(LOCALBIN)
-	curl -sLO "https://github.com/pfnet/kaptest/releases/download/${KAPTEST_VERSION}/kaptest_Linux_x86_64.tar.gz" && \
-	tar -xzf kaptest_Linux_x86_64.tar.gz -C $(LOCALBIN) kaptest && \
-	rm -f kaptest_Linux_x86_64.tar.gz
-
-.PHONY: yq
-yq: $(YQ) ## Download yq locally if necessary.
-$(YQ): $(LOCALBIN)
-	curl -sLO "https://github.com/mikefarah/yq/releases/download/$(YQ_VERSION)/yq_linux_amd64.tar.gz" && \
-	tar -xzf yq_linux_amd64.tar.gz ./yq_linux_amd64 && \
-	mv yq_linux_amd64 $(YQ) && \
-	chmod +x $(YQ) && \
-	rm -f yq_linux_amd64.tar.gz
+	$(call go-install-tool,$(GOLANGCI_LINT),github.com/golangci/golangci-lint/cmd/golangci-lint,$(GOLANGCI_LINT_VERSION))
 
 # go-install-tool will 'go install' any package with custom target and name of binary, if it doesn't exist
 # $1 - target path with name of binary
@@ -228,16 +222,3 @@ mv $(1) $(1)-$(3) ;\
 } ;\
 ln -sf $(1)-$(3) $(1)
 endef
-
-# Tool versions
-MDBOOK_VERSION = 0.4.52
-MDBOOK := $(LOCALBIN)/mdbook
-
-.PHONY: book
-book: $(MDBOOK)
-	rm -rf docs/book
-	cd docs; $(MDBOOK) build
-
-$(MDBOOK):
-	mkdir -p $(LOCALBIN)
-	curl -fsL https://github.com/rust-lang/mdBook/releases/download/v$(MDBOOK_VERSION)/mdbook-v$(MDBOOK_VERSION)-x86_64-unknown-linux-gnu.tar.gz | tar -C $(LOCALBIN) -xzf -

@@ -1,8 +1,0 @@
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: "registry-allowlist"
-  namespace: "ofen-system"
-data:
-  ghcr: "ghcr.io/"
-  quay: "quay.io/"
