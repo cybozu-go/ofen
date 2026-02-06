@@ -8,12 +8,20 @@ import (
 
 // NodeImageSetStatusApplyConfiguration represents a declarative configuration of the NodeImageSetStatus type for use
 // with apply.
+//
+// NodeImageSetStatus defines the observed state of NodeImageSet
 type NodeImageSetStatusApplyConfiguration struct {
-	ObservedGeneration     *int64                                   `json:"observedGeneration,omitempty"`
-	Conditions             []metav1.ConditionApplyConfiguration     `json:"conditions,omitempty"`
-	DesiredImages          *int                                     `json:"desiredImages,omitempty"`
-	AvailableImages        *int                                     `json:"availableImages,omitempty"`
-	DownloadFailedImages   *int                                     `json:"downloadFailedImages,omitempty"`
+	// The generation observed by the controller.
+	ObservedGeneration *int64 `json:"observedGeneration,omitempty"`
+	// Conditions represent the latest available observations of an object's state
+	Conditions []metav1.ConditionApplyConfiguration `json:"conditions,omitempty"`
+	// DesiredImages is the number of images that need to be downloaded.
+	DesiredImages *int `json:"desiredImages,omitempty"`
+	// AvailableImages is the number of images that have completed downloading.
+	AvailableImages *int `json:"availableImages,omitempty"`
+	// DownloadFailedImages is the number of images that failed to download.
+	DownloadFailedImages *int `json:"downloadFailedImages,omitempty"`
+	// ContainerImageStatuses holds the status of each container image.
 	ContainerImageStatuses []ContainerImageStatusApplyConfiguration `json:"containerImageStatuses,omitempty"`
 }
 

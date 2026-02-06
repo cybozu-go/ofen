@@ -69,14 +69,14 @@ var _ = Describe("NodeImageSet Controller", Serial, func() {
 				NodeName:         nodeName,
 				ImagePuller:      imagePuller,
 				ContainerdClient: fakeContainerdClient,
-				Recorder:         mgr.GetEventRecorderFor("nodeimageset-controller"),
+				Recorder:         mgr.GetEventRecorder("nodeimageset-controller"),
 				Queue:            queue,
 			}
 			err = reconciler.SetupWithManager(mgr, ch)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Create and start runner
-			runner := NewRunner(imagePuller, ctrl.Log.WithName("test-runner"), queue, mgr.GetEventRecorderFor("test-runner"))
+			runner := NewRunner(imagePuller, ctrl.Log.WithName("test-runner"), queue, mgr.GetEventRecorder("test-runner"))
 			err = mgr.Add(runner)
 			Expect(err).NotTo(HaveOccurred())
 

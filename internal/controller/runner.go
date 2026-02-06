@@ -5,7 +5,7 @@ import (
 
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"k8s.io/client-go/util/workqueue"
 
 	"github.com/cybozu-go/ofen/internal/imgmanager"
@@ -15,10 +15,10 @@ type Runner struct {
 	imagePuller *imgmanager.ImagePuller
 	logger      logr.Logger
 	queue       workqueue.TypedRateLimitingInterface[imgmanager.Task]
-	recorder    record.EventRecorder
+	recorder    events.EventRecorder
 }
 
-func NewRunner(imagePuller *imgmanager.ImagePuller, logger logr.Logger, queue workqueue.TypedRateLimitingInterface[imgmanager.Task], recorder record.EventRecorder) *Runner {
+func NewRunner(imagePuller *imgmanager.ImagePuller, logger logr.Logger, queue workqueue.TypedRateLimitingInterface[imgmanager.Task], recorder events.EventRecorder) *Runner {
 	return &Runner{
 		imagePuller: imagePuller,
 		logger:      logger,
@@ -70,14 +70,14 @@ func (r *Runner) processTask(ctx context.Context, task imgmanager.Task) error {
 		return nil
 	}
 
-	r.recorder.Eventf(task.NodeImageSet, corev1.EventTypeNormal, "ImageDownloading", "downloading image %s on %s", task.Ref, task.NodeImageSet.Spec.NodeName)
+	r.recorder.Eventf(task.NodeImageSet, nil, corev1.EventTypeNormal, "ImageDownloading", "ImageDownloading", "downloading image %s on %s", task.Ref, task.NodeImageSet.Spec.NodeName)
 	err := r.imagePuller.PullImage(ctx, task.NodeImageSet.Name, task.Ref, task.RegistryPolicy, task.Secrets)
 	if err != nil {
-		r.recorder.Eventf(task.NodeImageSet, corev1.EventTypeWarning, "ImageDownloadFailed", "failed to download image %s: %v on %s", task.Ref, err, task.NodeImageSet.Spec.NodeName)
+		r.recorder.Eventf(task.NodeImageSet, nil, corev1.EventTypeWarning, "ImageDownloadFailed", "ImageDownloadFailed", "failed to download image %s: %v on %s", task.Ref, err, task.NodeImageSet.Spec.NodeName)
 		return err
 	}
 
-	r.recorder.Eventf(task.NodeImageSet, corev1.EventTypeNormal, "ImageDownloaded", "successfully downloaded image %s on %s", task.Ref, task.NodeImageSet.Spec.NodeName)
+	r.recorder.Eventf(task.NodeImageSet, nil, corev1.EventTypeNormal, "ImageDownloaded", "ImageDownloaded", "successfully downloaded image %s on %s", task.Ref, task.NodeImageSet.Spec.NodeName)
 	r.logger.Info("successfully processed image", "image", task.Ref)
 	return nil
 }

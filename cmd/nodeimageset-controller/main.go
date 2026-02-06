@@ -130,7 +130,7 @@ func main() {
 		imagePuller,
 		ctrl.Log.WithName("runner").WithValues("nodeName", nodeName),
 		queue,
-		mgr.GetEventRecorderFor("image-pull-runner"),
+		mgr.GetEventRecorder("image-pull-runner"),
 	)
 	err = mgr.Add(runner)
 	if err != nil {
@@ -157,7 +157,7 @@ func main() {
 		Client:           mgr.GetClient(),
 		Scheme:           mgr.GetScheme(),
 		NodeName:         nodeName,
-		Recorder:         mgr.GetEventRecorderFor("nodeimageset-controller"),
+		Recorder:         mgr.GetEventRecorder("nodeimageset-controller"),
 		ContainerdClient: containerdClient,
 		ImagePuller:      imagePuller,
 		Queue:            queue,

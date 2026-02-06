@@ -13,6 +13,8 @@ import (
 
 // ImagePrefetchApplyConfiguration represents a declarative configuration of the ImagePrefetch type for use
 // with apply.
+//
+// ImagePrefetch is the Schema for the imageprefetches API
 type ImagePrefetchApplyConfiguration struct {
 	metav1.TypeMetaApplyConfiguration    `json:",inline"`
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
@@ -31,29 +33,14 @@ func ImagePrefetch(name, namespace string) *ImagePrefetchApplyConfiguration {
 	return b
 }
 
-// ExtractImagePrefetch extracts the applied configuration owned by fieldManager from
-// imagePrefetch. If no managedFields are found in imagePrefetch for fieldManager, a
-// ImagePrefetchApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. It is possible that no managed fields were found for because other
-// field managers have taken ownership of all the fields previously owned by fieldManager, or because
-// the fieldManager never owned fields any fields.
+// ExtractImagePrefetchFrom extracts the applied configuration owned by fieldManager from
+// imagePrefetch for the specified subresource. Pass an empty string for subresource to extract
+// the main resource. Common subresources include "status", "scale", etc.
 // imagePrefetch must be a unmodified ImagePrefetch API object that was retrieved from the Kubernetes API.
-// ExtractImagePrefetch provides a way to perform a extract/modify-in-place/apply workflow.
+// ExtractImagePrefetchFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
-func ExtractImagePrefetch(imagePrefetch *apiv1.ImagePrefetch, fieldManager string) (*ImagePrefetchApplyConfiguration, error) {
-	return extractImagePrefetch(imagePrefetch, fieldManager, "")
-}
-
-// ExtractImagePrefetchStatus is the same as ExtractImagePrefetch except
-// that it extracts the status subresource applied configuration.
-// Experimental!
-func ExtractImagePrefetchStatus(imagePrefetch *apiv1.ImagePrefetch, fieldManager string) (*ImagePrefetchApplyConfiguration, error) {
-	return extractImagePrefetch(imagePrefetch, fieldManager, "status")
-}
-
-func extractImagePrefetch(imagePrefetch *apiv1.ImagePrefetch, fieldManager string, subresource string) (*ImagePrefetchApplyConfiguration, error) {
+func ExtractImagePrefetchFrom(imagePrefetch *apiv1.ImagePrefetch, fieldManager string, subresource string) (*ImagePrefetchApplyConfiguration, error) {
 	b := &ImagePrefetchApplyConfiguration{}
 	err := managedfields.ExtractInto(imagePrefetch, internal.Parser().Type("com.github.cybozu-go.ofen.api.v1.ImagePrefetch"), fieldManager, b, subresource)
 	if err != nil {
@@ -66,6 +53,27 @@ func extractImagePrefetch(imagePrefetch *apiv1.ImagePrefetch, fieldManager strin
 	b.WithAPIVersion("ofen.cybozu.io/v1")
 	return b, nil
 }
+
+// ExtractImagePrefetch extracts the applied configuration owned by fieldManager from
+// imagePrefetch. If no managedFields are found in imagePrefetch for fieldManager, a
+// ImagePrefetchApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
+// field managers have taken ownership of all the fields previously owned by fieldManager, or because
+// the fieldManager never owned fields any fields.
+// imagePrefetch must be a unmodified ImagePrefetch API object that was retrieved from the Kubernetes API.
+// ExtractImagePrefetch provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+func ExtractImagePrefetch(imagePrefetch *apiv1.ImagePrefetch, fieldManager string) (*ImagePrefetchApplyConfiguration, error) {
+	return ExtractImagePrefetchFrom(imagePrefetch, fieldManager, "")
+}
+
+// ExtractImagePrefetchStatus extracts the applied configuration owned by fieldManager from
+// imagePrefetch for the status subresource.
+func ExtractImagePrefetchStatus(imagePrefetch *apiv1.ImagePrefetch, fieldManager string) (*ImagePrefetchApplyConfiguration, error) {
+	return ExtractImagePrefetchFrom(imagePrefetch, fieldManager, "status")
+}
+
 func (b ImagePrefetchApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value

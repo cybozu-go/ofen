@@ -11,16 +11,13 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	metav1apply "k8s.io/client-go/applyconfigurations/meta/v1"
-	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -190,7 +187,7 @@ func isNeedNodeSelection(imgPrefetch *ofenv1.ImagePrefetch, readyNodes []corev1.
 }
 
 func getNodeNames(nodes []corev1.Node) []string {
-	nodeNames := []string{}
+	nodeNames := make([]string, 0, len(nodes))
 	for _, node := range nodes {
 		nodeNames = append(nodeNames, node.Name)
 	}
@@ -310,7 +307,7 @@ func (r *ImagePrefetchReconciler) createOrUpdateNodeImageSet(ctx context.Context
 				WithImagePrefetchGeneration(imgPrefetch.Generation),
 			)
 
-		if err := r.applyNodeImageSet(ctx, nodeImageSet, nodeImageSetName); err != nil {
+		if err := r.Apply(ctx, nodeImageSet, client.FieldOwner(constants.ImagePrefetchFieldManager), client.ForceOwnership); err != nil {
 			return fmt.Errorf("failed to apply NodeImageSet: %w", err)
 		}
 	}
@@ -356,33 +353,6 @@ func getMaxNodeImageSetsToCreate(currentNodeImageSets ofenv1.NodeImageSetList, m
 		return readyNodeImageSetsCount + maxConcurrentNodeImageSetCreations
 	}
 	return desiredNodeImageSetsCount
-}
-
-func (r *ImagePrefetchReconciler) applyNodeImageSet(ctx context.Context, nodeImageSet *ofenv1apply.NodeImageSetApplyConfiguration, name string) error {
-	obj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(nodeImageSet)
-	if err != nil {
-		return fmt.Errorf("failed to convert NodeImageSet: %w", err)
-	}
-	patch := &unstructured.Unstructured{Object: obj}
-
-	var current ofenv1.NodeImageSet
-	err = r.Get(ctx, client.ObjectKey{Name: name}, &current)
-	if !errors.IsNotFound(err) && err != nil {
-		return fmt.Errorf("failed to get NodeImageSet: %w", err)
-	}
-
-	currentApplyConfig, err := ofenv1apply.ExtractNodeImageSet(&current, constants.ImagePrefetchFieldManager)
-	if err != nil {
-		return fmt.Errorf("failed to extract NodeImageSet: %w", err)
-	}
-	if equality.Semantic.DeepEqual(currentApplyConfig, nodeImageSet) {
-		return nil
-	}
-
-	return r.Patch(ctx, patch, client.Apply, &client.PatchOptions{
-		FieldManager: constants.ImagePrefetchFieldManager,
-		Force:        ptr.To(true),
-	})
 }
 
 func labelSet(imgPrefetch *ofenv1.ImagePrefetch, nodeName string) map[string]string {
@@ -491,7 +461,7 @@ func (r *ImagePrefetchReconciler) updateStatus(ctx context.Context, imgPrefetch 
 		)
 	}
 
-	if err := r.applyImagePrefetchStatus(ctx, imgPrefetchSSA, imgPrefetch.Name); err != nil {
+	if err := r.SubResource("status").Apply(ctx, imgPrefetchSSA, client.ForceOwnership, client.FieldOwner(constants.ImagePrefetchFieldManager)); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to update ImagePrefetch status: %w", err)
 	}
 
@@ -538,31 +508,6 @@ func calculateStatus(selectNodes []string, nodeImageSets *ofenv1.NodeImageSetLis
 	}
 
 	return status
-}
-
-func (r *ImagePrefetchReconciler) applyImagePrefetchStatus(ctx context.Context, imgPrefetch *ofenv1apply.ImagePrefetchApplyConfiguration, name string) error {
-	obj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(imgPrefetch)
-	if err != nil {
-		return fmt.Errorf("failed to convert ImagePrefetch status: %w", err)
-	}
-	patch := &unstructured.Unstructured{Object: obj}
-
-	var current ofenv1.ImagePrefetch
-	err = r.Get(ctx, types.NamespacedName{Name: name}, &current)
-	if !errors.IsNotFound(err) && err != nil {
-		return fmt.Errorf("failed to get ImagePrefetch for status update: %w", err)
-	}
-
-	currentStatusApplyConfig, err := ofenv1apply.ExtractImagePrefetchStatus(&current, constants.ImagePrefetchFieldManager)
-	if err != nil {
-		return fmt.Errorf("failed to extract ImagePrefetch status: %w", err)
-	}
-
-	if equality.Semantic.DeepEqual(currentStatusApplyConfig, imgPrefetch) {
-		return nil
-	}
-
-	return r.Status().Patch(ctx, patch, client.Apply, client.ForceOwnership, client.FieldOwner(constants.ImagePrefetchFieldManager))
 }
 
 func (r *ImagePrefetchReconciler) setMetrics(imgPrefetch *ofenv1.ImagePrefetch) {

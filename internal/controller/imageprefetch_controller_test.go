@@ -222,7 +222,7 @@ var _ = Describe("ImagePrefetch Controller", Serial, func() {
 				})
 				g.Expect(err).NotTo(HaveOccurred())
 				g.Expect(nodeImageSets.Items).To(HaveLen(replicas))
-				nodeList := []string{}
+				nodeList := make([]string, 0, len(nodeImageSets.Items))
 				for _, nodeImageSet := range nodeImageSets.Items {
 					g.Expect(nodeImageSet.Spec.Images).Should(ConsistOf(testImagesList))
 					nodeList = append(nodeList, nodeImageSet.Spec.NodeName)
@@ -377,7 +377,7 @@ var _ = Describe("ImagePrefetch Controller", Serial, func() {
 				})
 				g.Expect(err).NotTo(HaveOccurred())
 				g.Expect(nodeImageSets.Items).To(HaveLen(replicas))
-				var scheduleNodeName []string
+				scheduleNodeName := make([]string, 0, len(nodeImageSets.Items))
 				for _, nodeImageSet := range nodeImageSets.Items {
 					scheduleNodeName = append(scheduleNodeName, nodeImageSet.Spec.NodeName)
 				}
@@ -1029,7 +1029,7 @@ var _ = Describe("ImagePrefetch Controller", Serial, func() {
 					},
 				}
 
-				var containerImageStatuses []ofenv1.ContainerImageStatus
+				containerImageStatuses := make([]ofenv1.ContainerImageStatus, 0, len(nodeImageSet.Spec.Images))
 				for _, image := range nodeImageSet.Spec.Images {
 					containerImageStatuses = append(containerImageStatuses, ofenv1.ContainerImageStatus{
 						ImageRef: image,

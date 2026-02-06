@@ -2,12 +2,9 @@ package v1
 
 import (
 	"context"
-	"fmt"
 
-	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	ofenv1 "github.com/cybozu-go/ofen/api/v1"
@@ -18,8 +15,7 @@ var imageprefetchlog = logf.Log.WithName("imageprefetch-resource")
 
 // SetupImagePrefetchWebhookWithManager registers the webhook for ImagePrefetch in the manager.
 func SetupImagePrefetchWebhookWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewWebhookManagedBy(mgr).
-		For(&ofenv1.ImagePrefetch{}).
+	return ctrl.NewWebhookManagedBy(mgr, &ofenv1.ImagePrefetch{}).
 		WithDefaulter(&ImagePrefetchCustomDefaulter{}).
 		WithValidator(&ImagePrefetchCustomValidator{}).
 		Complete()
@@ -31,16 +27,11 @@ type ImagePrefetchCustomDefaulter struct {
 	// TODO(user): Add more fields as needed for defaulting
 }
 
-var _ webhook.CustomDefaulter = &ImagePrefetchCustomDefaulter{}
+var _ admission.Defaulter[*ofenv1.ImagePrefetch] = &ImagePrefetchCustomDefaulter{}
 
-// Default implements webhook.CustomDefaulter so a webhook will be registered for the Kind ImagePrefetch.
-func (d *ImagePrefetchCustomDefaulter) Default(ctx context.Context, obj runtime.Object) error {
-	imageprefetch, ok := obj.(*ofenv1.ImagePrefetch)
-
-	if !ok {
-		return fmt.Errorf("expected an ImagePrefetch object but got %T", obj)
-	}
-	imageprefetchlog.Info("Defaulting for ImagePrefetch", "name", imageprefetch.GetName())
+// Default implements admission.Defaulter so a webhook will be registered for the Kind ImagePrefetch.
+func (d *ImagePrefetchCustomDefaulter) Default(ctx context.Context, obj *ofenv1.ImagePrefetch) error {
+	imageprefetchlog.Info("Defaulting for ImagePrefetch", "name", obj.GetName())
 
 	// TODO(user): fill in your defaulting logic.
 
@@ -56,41 +47,29 @@ type ImagePrefetchCustomValidator struct {
 	// TODO(user): Add more fields as needed for validation
 }
 
-var _ webhook.CustomValidator = &ImagePrefetchCustomValidator{}
+var _ admission.Validator[*ofenv1.ImagePrefetch] = &ImagePrefetchCustomValidator{}
 
-// ValidateCreate implements webhook.CustomValidator so a webhook will be registered for the type ImagePrefetch.
-func (v *ImagePrefetchCustomValidator) ValidateCreate(ctx context.Context, obj runtime.Object) (admission.Warnings, error) {
-	imageprefetch, ok := obj.(*ofenv1.ImagePrefetch)
-	if !ok {
-		return nil, fmt.Errorf("expected a ImagePrefetch object but got %T", obj)
-	}
-	imageprefetchlog.Info("Validation for ImagePrefetch upon creation", "name", imageprefetch.GetName())
+// ValidateCreate implements admission.Validator so a webhook will be registered for the type ImagePrefetch.
+func (v *ImagePrefetchCustomValidator) ValidateCreate(ctx context.Context, obj *ofenv1.ImagePrefetch) (admission.Warnings, error) {
+	imageprefetchlog.Info("Validation for ImagePrefetch upon creation", "name", obj.GetName())
 
 	// TODO(user): fill in your validation logic upon object creation.
 
 	return nil, nil
 }
 
-// ValidateUpdate implements webhook.CustomValidator so a webhook will be registered for the type ImagePrefetch.
-func (v *ImagePrefetchCustomValidator) ValidateUpdate(ctx context.Context, oldObj, newObj runtime.Object) (admission.Warnings, error) {
-	imageprefetch, ok := newObj.(*ofenv1.ImagePrefetch)
-	if !ok {
-		return nil, fmt.Errorf("expected a ImagePrefetch object for the newObj but got %T", newObj)
-	}
-	imageprefetchlog.Info("Validation for ImagePrefetch upon update", "name", imageprefetch.GetName())
+// ValidateUpdate implements admission.Validator so a webhook will be registered for the type ImagePrefetch.
+func (v *ImagePrefetchCustomValidator) ValidateUpdate(ctx context.Context, oldObj, newObj *ofenv1.ImagePrefetch) (admission.Warnings, error) {
+	imageprefetchlog.Info("Validation for ImagePrefetch upon update", "name", newObj.GetName())
 
 	// TODO(user): fill in your validation logic upon object update.
 
 	return nil, nil
 }
 
-// ValidateDelete implements webhook.CustomValidator so a webhook will be registered for the type ImagePrefetch.
-func (v *ImagePrefetchCustomValidator) ValidateDelete(ctx context.Context, obj runtime.Object) (admission.Warnings, error) {
-	imageprefetch, ok := obj.(*ofenv1.ImagePrefetch)
-	if !ok {
-		return nil, fmt.Errorf("expected a ImagePrefetch object but got %T", obj)
-	}
-	imageprefetchlog.Info("Validation for ImagePrefetch upon deletion", "name", imageprefetch.GetName())
+// ValidateDelete implements admission.Validator so a webhook will be registered for the type ImagePrefetch.
+func (v *ImagePrefetchCustomValidator) ValidateDelete(ctx context.Context, obj *ofenv1.ImagePrefetch) (admission.Warnings, error) {
+	imageprefetchlog.Info("Validation for ImagePrefetch upon deletion", "name", obj.GetName())
 
 	// TODO(user): fill in your validation logic upon object deletion.
 
