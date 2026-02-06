@@ -5,9 +5,12 @@ package v1
 // ContainerImageStatusApplyConfiguration represents a declarative configuration of the ContainerImageStatus type for use
 // with apply.
 type ContainerImageStatusApplyConfiguration struct {
+	// ImageRef is the reference of the image.
 	ImageRef *string `json:"imageRef,omitempty"`
-	Error    *string `json:"error,omitempty"`
-	State    *string `json:"lastState,omitempty"`
+	// Error is the error message for the image download.
+	Error *string `json:"error,omitempty"`
+	// State is the state of the image download.
+	State *string `json:"lastState,omitempty"`
 }
 
 // ContainerImageStatusApplyConfiguration constructs a declarative configuration of the ContainerImageStatus type for use with

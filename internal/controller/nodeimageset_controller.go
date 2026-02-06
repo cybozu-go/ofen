@@ -6,15 +6,12 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	metav1apply "k8s.io/client-go/applyconfigurations/meta/v1"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"k8s.io/client-go/util/workqueue"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -39,7 +36,7 @@ type NodeImageSetReconciler struct {
 	NodeName         string
 	ImagePuller      *imgmanager.ImagePuller
 	ContainerdClient imgmanager.ContainerdClient
-	Recorder         record.EventRecorder
+	Recorder         events.EventRecorder
 	Queue            workqueue.TypedRateLimitingInterface[imgmanager.Task]
 }
 
@@ -48,7 +45,7 @@ type NodeImageSetReconciler struct {
 // +kubebuilder:rbac:groups=ofen.cybozu.io,resources=nodeimagesets/finalizers,verbs=update
 // +kubebuilder:rbac:groups=core,resources=nodes,verbs=get;list;watch
 // +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch
-// +kubebuilder:rbac:groups=core,resources=events,verbs=create;update;patch
+// +kubebuilder:rbac:groups=events.k8s.io,resources=events,verbs=create;update;patch
 
 func (r *NodeImageSetReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
@@ -254,7 +251,7 @@ func (r *NodeImageSetReconciler) updateStatus(ctx context.Context, nodeImageSet 
 		)
 	}
 
-	if err := r.applyNodeImageSetStatus(ctx, nodeImageSetSSA, nodeImageSet.Name); err != nil {
+	if err := r.SubResource("status").Apply(ctx, nodeImageSetSSA, client.ForceOwnership, client.FieldOwner(constants.NodeImageSetFieldManager)); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to update status: %w", err)
 	}
 	return result, nil
@@ -310,33 +307,6 @@ func (r *NodeImageSetReconciler) calculateImageStatus(ctx context.Context, nis *
 		}
 	}
 	return downloadedImage, failed
-}
-
-func (r *NodeImageSetReconciler) applyNodeImageSetStatus(ctx context.Context, nodeImageSetSSA *ofenv1apply.NodeImageSetApplyConfiguration, name string) error {
-	obj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(nodeImageSetSSA)
-	if err != nil {
-		return fmt.Errorf("failed to convert to unstructured: %w", err)
-	}
-	patch := &unstructured.Unstructured{
-		Object: obj,
-	}
-
-	var current ofenv1.NodeImageSet
-	err = r.Get(ctx, types.NamespacedName{Name: name}, &current)
-	if !apierrors.IsNotFound(err) && err != nil {
-		return fmt.Errorf("failed to get NodeImageSet for status update: %w", err)
-	}
-
-	currentStatusApplyConfig, err := ofenv1apply.ExtractNodeImageSetStatus(&current, constants.NodeImageSetFieldManager)
-	if err != nil {
-		return fmt.Errorf("failed to extract NodeImageSet status: %w", err)
-	}
-
-	if equality.Semantic.DeepEqual(currentStatusApplyConfig, nodeImageSetSSA.Status) {
-		return nil
-	}
-
-	return r.Status().Patch(ctx, patch, client.Apply, client.ForceOwnership, client.FieldOwner(constants.NodeImageSetFieldManager))
 }
 
 // SetupWithManager sets up the controller with the Manager.

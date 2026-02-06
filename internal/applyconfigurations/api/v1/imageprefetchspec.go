@@ -9,12 +9,19 @@ import (
 
 // ImagePrefetchSpecApplyConfiguration represents a declarative configuration of the ImagePrefetchSpec type for use
 // with apply.
+//
+// ImagePrefetchSpec defines the desired state of ImagePrefetch
 type ImagePrefetchSpecApplyConfiguration struct {
-	Images           []string                                `json:"images,omitempty"`
-	NodeSelector     *metav1.LabelSelectorApplyConfiguration `json:"nodeSelector,omitempty"`
-	AllNodes         *bool                                   `json:"allNodes,omitempty"`
-	Replicas         *int                                    `json:"replicas,omitempty"`
-	ImagePullSecrets []corev1.LocalObjectReference           `json:"imagePullSecrets,omitempty"`
+	// Images is a list of container images that will be pre-downloaded to the target nodes
+	Images []string `json:"images,omitempty"`
+	// NodeSelector is a map of key-value pairs that specify which nodes should have the images pre-downloaded
+	NodeSelector *metav1.LabelSelectorApplyConfiguration `json:"nodeSelector,omitempty"`
+	// AllNodes indicates whether the images should be pre-downloaded to all nodes filtered by the NodeSelector in the cluster
+	AllNodes *bool `json:"allNodes,omitempty"`
+	// Replicas is the number of nodes that should download the specified images
+	Replicas *int `json:"replicas,omitempty"`
+	// ImagePullSecrets is a list of secret names that contain credentials for authenticating with container registries
+	ImagePullSecrets []corev1.LocalObjectReference `json:"imagePullSecrets,omitempty"`
 }
 
 // ImagePrefetchSpecApplyConfiguration constructs a declarative configuration of the ImagePrefetchSpec type for use with

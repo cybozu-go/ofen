@@ -13,6 +13,8 @@ import (
 
 // NodeImageSetApplyConfiguration represents a declarative configuration of the NodeImageSet type for use
 // with apply.
+//
+// NodeImageSet is the Schema for the nodeimagesets API
 type NodeImageSetApplyConfiguration struct {
 	metav1.TypeMetaApplyConfiguration    `json:",inline"`
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
@@ -30,29 +32,14 @@ func NodeImageSet(name string) *NodeImageSetApplyConfiguration {
 	return b
 }
 
-// ExtractNodeImageSet extracts the applied configuration owned by fieldManager from
-// nodeImageSet. If no managedFields are found in nodeImageSet for fieldManager, a
-// NodeImageSetApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. It is possible that no managed fields were found for because other
-// field managers have taken ownership of all the fields previously owned by fieldManager, or because
-// the fieldManager never owned fields any fields.
+// ExtractNodeImageSetFrom extracts the applied configuration owned by fieldManager from
+// nodeImageSet for the specified subresource. Pass an empty string for subresource to extract
+// the main resource. Common subresources include "status", "scale", etc.
 // nodeImageSet must be a unmodified NodeImageSet API object that was retrieved from the Kubernetes API.
-// ExtractNodeImageSet provides a way to perform a extract/modify-in-place/apply workflow.
+// ExtractNodeImageSetFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
-// Experimental!
-func ExtractNodeImageSet(nodeImageSet *apiv1.NodeImageSet, fieldManager string) (*NodeImageSetApplyConfiguration, error) {
-	return extractNodeImageSet(nodeImageSet, fieldManager, "")
-}
-
-// ExtractNodeImageSetStatus is the same as ExtractNodeImageSet except
-// that it extracts the status subresource applied configuration.
-// Experimental!
-func ExtractNodeImageSetStatus(nodeImageSet *apiv1.NodeImageSet, fieldManager string) (*NodeImageSetApplyConfiguration, error) {
-	return extractNodeImageSet(nodeImageSet, fieldManager, "status")
-}
-
-func extractNodeImageSet(nodeImageSet *apiv1.NodeImageSet, fieldManager string, subresource string) (*NodeImageSetApplyConfiguration, error) {
+func ExtractNodeImageSetFrom(nodeImageSet *apiv1.NodeImageSet, fieldManager string, subresource string) (*NodeImageSetApplyConfiguration, error) {
 	b := &NodeImageSetApplyConfiguration{}
 	err := managedfields.ExtractInto(nodeImageSet, internal.Parser().Type("com.github.cybozu-go.ofen.api.v1.NodeImageSet"), fieldManager, b, subresource)
 	if err != nil {
@@ -64,6 +51,27 @@ func extractNodeImageSet(nodeImageSet *apiv1.NodeImageSet, fieldManager string, 
 	b.WithAPIVersion("ofen.cybozu.io/v1")
 	return b, nil
 }
+
+// ExtractNodeImageSet extracts the applied configuration owned by fieldManager from
+// nodeImageSet. If no managedFields are found in nodeImageSet for fieldManager, a
+// NodeImageSetApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
+// field managers have taken ownership of all the fields previously owned by fieldManager, or because
+// the fieldManager never owned fields any fields.
+// nodeImageSet must be a unmodified NodeImageSet API object that was retrieved from the Kubernetes API.
+// ExtractNodeImageSet provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+func ExtractNodeImageSet(nodeImageSet *apiv1.NodeImageSet, fieldManager string) (*NodeImageSetApplyConfiguration, error) {
+	return ExtractNodeImageSetFrom(nodeImageSet, fieldManager, "")
+}
+
+// ExtractNodeImageSetStatus extracts the applied configuration owned by fieldManager from
+// nodeImageSet for the status subresource.
+func ExtractNodeImageSetStatus(nodeImageSet *apiv1.NodeImageSet, fieldManager string) (*NodeImageSetApplyConfiguration, error) {
+	return ExtractNodeImageSetFrom(nodeImageSet, fieldManager, "status")
+}
+
 func (b NodeImageSetApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value

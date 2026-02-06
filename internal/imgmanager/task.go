@@ -22,7 +22,7 @@ func (t Task) LogValue() slog.Value {
 	}
 
 	if t.Secrets != nil {
-		var secretNames []string
+		secretNames := make([]string, 0, len(*t.Secrets))
 		for _, secret := range *t.Secrets {
 			secretNames = append(secretNames, secret.Name)
 		}
