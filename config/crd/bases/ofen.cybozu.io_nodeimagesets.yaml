@@ -54,6 +54,12 @@ spec:
           spec:
             description: NodeImageSetSpec defines the desired state of NodeImageSet
             properties:
+              imagePrefetchGeneration:
+                description: |-
+                  ImagePrefetchGeneration is the generation of the image prefetch resource.
+                  It is used to track the status of the image prefetch resource.
+                format: int64
+                type: integer
               imagePullSecrets:
                 description: ImagePullSecrets is a list of secret names that contain
                   credentials for authenticating with container registries
@@ -187,12 +193,6 @@ spec:
                 default: 0
                 description: DownloadFailedImages is the number of images that failed
                   to download.
-                type: integer
-              imagePrefetchGeneration:
-                description: |-
-                  ImagePrefetchGeneration is the generation of the image prefetch resource.
-                  It is used to track the status of the image prefetch resource.
-                format: int64
                 type: integer
               observedGeneration:
                 description: The generation observed by the controller.

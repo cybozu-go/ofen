@@ -10,10 +10,11 @@ import (
 // NodeImageSetSpecApplyConfiguration represents a declarative configuration of the NodeImageSetSpec type for use
 // with apply.
 type NodeImageSetSpecApplyConfiguration struct {
-	Images           []string                      `json:"images,omitempty"`
-	RegistryPolicy   *apiv1.RegistryPolicy         `json:"registryPolicy,omitempty"`
-	NodeName         *string                       `json:"nodeName,omitempty"`
-	ImagePullSecrets []corev1.LocalObjectReference `json:"imagePullSecrets,omitempty"`
+	Images                  []string                      `json:"images,omitempty"`
+	RegistryPolicy          *apiv1.RegistryPolicy         `json:"registryPolicy,omitempty"`
+	NodeName                *string                       `json:"nodeName,omitempty"`
+	ImagePullSecrets        []corev1.LocalObjectReference `json:"imagePullSecrets,omitempty"`
+	ImagePrefetchGeneration *int64                        `json:"imagePrefetchGeneration,omitempty"`
 }
 
 // NodeImageSetSpecApplyConfiguration constructs a declarative configuration of the NodeImageSetSpec type for use with
@@ -55,5 +56,13 @@ func (b *NodeImageSetSpecApplyConfiguration) WithImagePullSecrets(values ...core
 	for i := range values {
 		b.ImagePullSecrets = append(b.ImagePullSecrets, values[i])
 	}
+	return b
+}
+
+// WithImagePrefetchGeneration sets the ImagePrefetchGeneration field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the ImagePrefetchGeneration field is set to the value of the last call.
+func (b *NodeImageSetSpecApplyConfiguration) WithImagePrefetchGeneration(value int64) *NodeImageSetSpecApplyConfiguration {
+	b.ImagePrefetchGeneration = &value
 	return b
 }

@@ -212,6 +212,7 @@ var _ = Describe("NodeImageSet Controller", Serial, func() {
 		It("should update NodeImageSet status based on the actual image availability on the node", func() {
 			testName := "update-status-on-node-status-change"
 			image := fmt.Sprintf("test/%s/image:latest", testName)
+
 			By("creating a NodeImageSet resource with one image")
 			nodeImageSet := createNodeImageSet(testName).
 				WithLabels(map[string]string{
