@@ -9,12 +9,20 @@ import (
 
 // NodeImageSetSpecApplyConfiguration represents a declarative configuration of the NodeImageSetSpec type for use
 // with apply.
+//
+// NodeImageSetSpec defines the desired state of NodeImageSet
 type NodeImageSetSpecApplyConfiguration struct {
-	Images                  []string                      `json:"images,omitempty"`
-	RegistryPolicy          *apiv1.RegistryPolicy         `json:"registryPolicy,omitempty"`
-	NodeName                *string                       `json:"nodeName,omitempty"`
-	ImagePullSecrets        []corev1.LocalObjectReference `json:"imagePullSecrets,omitempty"`
-	ImagePrefetchGeneration *int64                        `json:"imagePrefetchGeneration,omitempty"`
+	// Images is a list of container images to be downloaded.
+	Images []string `json:"images,omitempty"`
+	// Registry Policy is the policy for downloading images from the registry.
+	RegistryPolicy *apiv1.RegistryPolicy `json:"registryPolicy,omitempty"`
+	// NodeName is the name of the node where the image is downloaded.
+	NodeName *string `json:"nodeName,omitempty"`
+	// ImagePullSecrets is a list of secret names that contain credentials for authenticating with container registries
+	ImagePullSecrets []corev1.LocalObjectReference `json:"imagePullSecrets,omitempty"`
+	// ImagePrefetchGeneration is the generation of the image prefetch resource.
+	// It is used to track the status of the image prefetch resource.
+	ImagePrefetchGeneration *int64 `json:"imagePrefetchGeneration,omitempty"`
 }
 
 // NodeImageSetSpecApplyConfiguration constructs a declarative configuration of the NodeImageSetSpec type for use with
