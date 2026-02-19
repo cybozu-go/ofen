@@ -8,14 +8,23 @@ import (
 
 // ImagePrefetchStatusApplyConfiguration represents a declarative configuration of the ImagePrefetchStatus type for use
 // with apply.
+//
+// ImagePrefetchStatus defines the observed state of ImagePrefetch
 type ImagePrefetchStatusApplyConfiguration struct {
-	ObservedGeneration   *int64                               `json:"observedGeneration,omitempty"`
-	Conditions           []metav1.ConditionApplyConfiguration `json:"conditions,omitempty"`
-	DesiredNodes         *int                                 `json:"desiredNodes,omitempty"`
-	ImagePulledNodes     *int                                 `json:"imagePulledNodes,omitempty"`
-	ImagePullingNodes    *int                                 `json:"imagePullingNodes,omitempty"`
-	ImagePullFailedNodes *int                                 `json:"imagePullFailedNodes,omitempty"`
-	SelectedNodes        []string                             `json:"selectedNodes,omitempty"`
+	// The generation observed by the controller.
+	ObservedGeneration *int64 `json:"observedGeneration,omitempty"`
+	// Conditions represent the latest available observations of an object's state
+	Conditions []metav1.ConditionApplyConfiguration `json:"conditions,omitempty"`
+	// DesiredNodes represents the number of nodes that should have the images pre-downloaded
+	DesiredNodes *int `json:"desiredNodes,omitempty"`
+	// ImagePulledNodes represents the number of nodes that have successfully pre-downloaded the images
+	ImagePulledNodes *int `json:"imagePulledNodes,omitempty"`
+	// ImagePullingNodes represents the number of nodes that are currently downloading the images
+	ImagePullingNodes *int `json:"imagePullingNodes,omitempty"`
+	// ImagePullFailedNodes represents the number of nodes that failed to download the images
+	ImagePullFailedNodes *int `json:"imagePullFailedNodes,omitempty"`
+	// SelectedNodes represents the nodes that have been selected to download the images
+	SelectedNodes []string `json:"selectedNodes,omitempty"`
 }
 
 // ImagePrefetchStatusApplyConfiguration constructs a declarative configuration of the ImagePrefetchStatus type for use with

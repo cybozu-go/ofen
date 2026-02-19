@@ -1,8 +1,7 @@
 include ../../Makefile.common
-E2ETEST_K8S_VERSION  := 1.34.0
-CERT_MANAGER_VERSION := 1.19.1
-SPEGEL_VERSION := 0.5.1
-KIND_VERSION := 0.30.0
+E2ETEST_K8S_VERSION  := 1.34.3
+SPEGEL_VERSION := 0.6.0
+KIND_VERSION := 0.31.0
 
 PROJECT_DIR := $(CURDIR)/../../
 BIN_DIR := $(PROJECT_DIR)/bin
@@ -32,7 +31,7 @@ setup:
 	GOBIN=$(BIN_DIR) go install sigs.k8s.io/kind@v$(KIND_VERSION)
 
 .PHONY: start
-start:
+start: setup
 	$(MAKE) -C ../../ docker-build
 	$(KIND) create cluster --name=$(KIND_CLUSTER_NAME) --config=$(KIND_CONFIG) --image=kindest/node:v$(E2ETEST_K8S_VERSION) --wait 1m
 	$(MAKE) kind-load
