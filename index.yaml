@@ -2,6 +2,17 @@ apiVersion: v1
 entries:
   ofen:
   - apiVersion: v2
+    appVersion: 0.8.0
+    created: "2026-02-25T00:26:34.628755587Z"
+    description: Ofen is a kubernetes controller that prefetch(preheat) container
+      images.
+    digest: 3485f408608f0f2238582b8ff31f4b232e494032b9f1a19b2de451e9ce6890b9
+    name: ofen
+    type: application
+    urls:
+    - https://github.com/cybozu-go/ofen/releases/download/ofen-chart-0.8.0/ofen-0.8.0.tgz
+    version: 0.8.0
+  - apiVersion: v2
     appVersion: 0.7.0
     created: "2026-02-09T00:19:41.422717597Z"
     description: Ofen is a kubernetes controller that prefetch(preheat) container
@@ -67,4 +78,4 @@ entries:
     urls:
     - https://github.com/cybozu-go/ofen/releases/download/ofen-chart-0.2.0/ofen-0.2.0.tgz
     version: 0.2.0
-generated: "2026-02-09T00:19:41.422740369Z"
+generated: "2026-02-25T00:26:34.62878856Z"
