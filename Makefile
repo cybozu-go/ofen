@@ -1,5 +1,5 @@
 include ./Makefile.common
-ENVTEST_K8S_VERSION = 1.34.1
+ENVTEST_K8S_VERSION = 1.35.0
 
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
@@ -26,7 +26,7 @@ manifests: ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefin
 	echo '{{- if .Values.crds.enabled }}' > charts/ofen/templates/generated/crds/crds.yaml
 	$(KUSTOMIZE) build config/kustomize-to-helm/overlays/crds | $(YQ) e "." - >> charts/ofen/templates/generated/crds/crds.yaml
 	echo '{{- end }}' >> charts/ofen/templates/generated/crds/crds.yaml
-	kustomize build config/kustomize-to-helm/overlays/templates | yq e "."  -p yaml - > charts/ofen/templates/generated/generated.yaml
+	$(KUSTOMIZE) build config/kustomize-to-helm/overlays/templates | yq e "."  -p yaml - > charts/ofen/templates/generated/generated.yaml
 
 .PHONY: generate
 generate: ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
