@@ -1,14 +1,11 @@
 include ../../Makefile.common
 E2ETEST_K8S_VERSION  := 1.34.3
 SPEGEL_VERSION := 0.6.0
-KIND_VERSION := 0.31.0
 
 PROJECT_DIR := $(CURDIR)/../../
-BIN_DIR := $(PROJECT_DIR)/bin
 
-CURL := curl -sSLf
-KUBECTL := $(BIN_DIR)/kubectl
-KIND := $(BIN_DIR)/kind
+KUBECTL ?= kubectl
+KIND ?= kind
 
 KIND_CLUSTER_NAME := ofen
 KIND_CONFIG := kind-config.yaml
@@ -26,12 +23,11 @@ help:
 
 .PHONY: setup
 setup:
-	mkdir -p $(BIN_DIR)
-	$(CURL) -o  $(BIN_DIR)/kubectl https://dl.k8s.io/release/v$(E2ETEST_K8S_VERSION)/bin/linux/amd64/kubectl && chmod a+x $(BIN_DIR)/kubectl
-	GOBIN=$(BIN_DIR) go install sigs.k8s.io/kind@v$(KIND_VERSION)
+	aqua policy allow ${PROJECT_DIR}/aqua-policy.yaml
+	aqua install -c ${PROJECT_DIR}/aqua.yaml -l
 
 .PHONY: start
-start: setup
+start:
 	$(MAKE) -C ../../ docker-build
 	$(KIND) create cluster --name=$(KIND_CLUSTER_NAME) --config=$(KIND_CONFIG) --image=kindest/node:v$(E2ETEST_K8S_VERSION) --wait 1m
 	$(MAKE) kind-load
