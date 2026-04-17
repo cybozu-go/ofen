@@ -8,3 +8,4 @@
 
 - [Design document](design.md)
 - [Release procedure](release.md)
+- [Maintenance](maintenance.md)

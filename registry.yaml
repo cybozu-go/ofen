@@ -1,0 +1,31 @@
+packages:
+  - type: github_release
+    repo_owner: pfnet
+    repo_name: kaptest
+    description: Kubernetes Admission Policy Test tool
+    version_constraint: "false"
+    version_overrides:
+      - version_constraint: "true"
+        asset: kaptest_{{.OS}}_{{.Arch}}.{{.Format}}
+        format: tar.gz
+        replacements:
+          amd64: x86_64
+          darwin: Darwin
+          linux: Linux
+          windows: Windows
+        checksum:
+          type: github_release
+          asset: kaptest_{{trimV .Version}}_checksums.txt
+          algorithm: sha256
+        overrides:
+          - goos: windows
+            format: zip
+  - type: go_build
+    name: kubernetes/kubernetes/pkg/generated/openapi/cmd/models-schema
+    repo_owner: kubernetes
+    repo_name: kubernetes
+    description: models-schema is a tool for auto-generating OpenAPI schema for Kubernetes API objects
+    files:
+      - name: models-schema
+        src: ./pkg/generated/openapi/cmd/models-schema
+        dir: kubernetes-{{trimV .Version}}
