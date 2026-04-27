@@ -35,7 +35,7 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-f6006db5.js";
+            window.path_to_searchindex_js = "searchindex-d2366ca6.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-90192cb0.js"></script>
@@ -185,7 +185,7 @@
 <p>ofen supports the three latest Kubernetes versions. To update the supported Kubernetes versions, please follow the steps below:</p>
 <ol>
 <li>Update <code>ENVTEST_K8S_VERSION</code> in <code>Makefile</code>.</li>
-<li>Update <code>E2ETEST_K8S_VERSION</code> in <code>test/e2e/Makefile</code>.</li>
+<li>Update <code>E2ETEST_K8S_VERSION</code> and <code>E2ETEST_KINDEST_NODE_IMAGE_HASH</code> in <code>test/e2e/Makefile</code>.</li>
 <li>Update <code>k8s.io/*</code> and <code>sigs.k8s.io/controller-runtime</code> packages in <code>go.mod</code>.</li>
 <li>Update <code>aqua.yaml</code> by running <code>aqua update --select-version</code>.</li>
 <li>Run <code>aqua update-checksum</code> to update <code>aqua-checksums.json</code>.</li>
