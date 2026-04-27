@@ -1,5 +1,6 @@
 include ../../Makefile.common
-E2ETEST_K8S_VERSION  := 1.34.3
+E2ETEST_K8S_VERSION  := 1.35.0
+E2ETEST_KINDEST_NODE_IMAGE_HASH := sha256:4613778f3cfcd10e615029370f5786704559103cf27bef934597ba562b269661
 SPEGEL_VERSION := 0.6.0
 
 PROJECT_DIR := $(CURDIR)/../../
@@ -29,7 +30,7 @@ setup:
 .PHONY: start
 start:
 	$(MAKE) -C ../../ docker-build
-	$(KIND) create cluster --name=$(KIND_CLUSTER_NAME) --config=$(KIND_CONFIG) --image=kindest/node:v$(E2ETEST_K8S_VERSION) --wait 1m
+	$(KIND) create cluster --name=$(KIND_CLUSTER_NAME) --config=$(KIND_CONFIG) --image=kindest/node:v$(E2ETEST_K8S_VERSION)@$(E2ETEST_KINDEST_NODE_IMAGE_HASH) --wait 1m
 	$(MAKE) kind-load
 	$(KUBECTL) apply -k ../../config/default
 	$(KUBECTL) -n ofen-system wait --for=condition=available --timeout=180s --all deployments
