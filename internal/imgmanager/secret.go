@@ -80,12 +80,12 @@ func processDockerCfg(data []byte, tokens map[string]Credentials) error {
 func extractCredentials(registry, authString string, tokens map[string]Credentials) error {
 	data, err := base64.StdEncoding.DecodeString(authString)
 	if err != nil {
-		return fmt.Errorf("failed to decode auth %s: %w", authString, err)
+		return fmt.Errorf("failed to decode auth [redacted]: %w", err)
 	}
 
 	username, password, ok := strings.Cut(string(data), ":")
 	if !ok {
-		return fmt.Errorf("failed to find username and password in auth %s", authString)
+		return fmt.Errorf("failed to find username and password in auth [redacted]")
 	}
 
 	tokens[registry] = Credentials{
