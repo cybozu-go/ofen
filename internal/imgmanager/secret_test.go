@@ -418,12 +418,13 @@ func TestExtractCredentials(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name          string
-		registry      string
-		authString    string
-		initialTokens map[string]Credentials
-		expectedCreds map[string]Credentials
-		expectError   bool
+		name             string
+		registry         string
+		authString       string
+		initialTokens    map[string]Credentials
+		expectedCreds    map[string]Credentials
+		expectError      bool
+		forbiddenStrings []string
 	}{
 		{
 			name:          "valid auth",
@@ -465,12 +466,13 @@ func TestExtractCredentials(t *testing.T) {
 			expectError: false,
 		},
 		{
-			name:          "invalid base64",
-			registry:      "registry.example.com",
-			authString:    "invalid-base64!",
-			initialTokens: map[string]Credentials{},
-			expectedCreds: nil,
-			expectError:   true,
+			name:             "invalid base64",
+			registry:         "registry.example.com",
+			authString:       "invalid-base64!",
+			initialTokens:    map[string]Credentials{},
+			expectedCreds:    nil,
+			expectError:      true,
+			forbiddenStrings: []string{"invalid-base64!"},
 		},
 		{
 			name:          "no colon in auth",
@@ -479,6 +481,8 @@ func TestExtractCredentials(t *testing.T) {
 			initialTokens: map[string]Credentials{},
 			expectedCreds: nil,
 			expectError:   true,
+			// error must not leak the base64-encoded auth string or its decoded value
+			forbiddenStrings: []string{base64.StdEncoding.EncodeToString([]byte("nocolon")), "nocolon"},
 		},
 		{
 			name:       "add to existing tokens",
@@ -515,6 +519,9 @@ func TestExtractCredentials(t *testing.T) {
 			err := extractCredentials(tt.registry, tt.authString, tokens)
 			if tt.expectError {
 				require.Error(t, err)
+				for _, forbidden := range tt.forbiddenStrings {
+					require.NotContains(t, err.Error(), forbidden)
+				}
 			} else {
 				require.NoError(t, err)
 				require.Equal(t, tt.expectedCreds, tokens)
