@@ -1,10 +1,8 @@
 apiVersion: ofen.cybozu.io/v1
 kind: ImagePrefetch
 metadata:
-  labels:
-    app.kubernetes.io/name: ofen
-    app.kubernetes.io/managed-by: kustomize
-  name: imageprefetch-sample
+  name: e2e-pin-test
+  namespace: e2e-test
 spec:
   images:
     - ghcr.io/cybozu/ubuntu:24.04

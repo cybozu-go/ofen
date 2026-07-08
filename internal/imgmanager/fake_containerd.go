@@ -19,6 +19,8 @@ type FakeContainerd struct {
 	mu                 sync.Mutex
 	pulledImages       map[string]bool
 	pullErrorOverrides map[string]error
+	pinnedImages       map[string]bool
+	inUseImages        map[string]bool
 	k8sClient          ctrl.Client
 	pullDelay          time.Duration // Simulate delay for pulling images
 	testEventsCh       chan *events.Envelope
@@ -29,6 +31,8 @@ func NewFakeContainerd(k8sClient ctrl.Client) *FakeContainerd {
 	return &FakeContainerd{
 		pulledImages:       make(map[string]bool),
 		pullErrorOverrides: make(map[string]error),
+		pinnedImages:       make(map[string]bool),
+		inUseImages:        make(map[string]bool),
 		k8sClient:          k8sClient,
 		testEventsCh:       make(chan *events.Envelope, 10),
 		testErrCh:          make(chan error, 10),
@@ -117,8 +121,61 @@ func (f *FakeContainerd) PullImage(ctx context.Context, ref string, policy ofenv
 		time.Sleep(f.pullDelay)
 	}
 	f.pulledImages[ref] = true
+	// Pulled images are pinned by ofen, mirroring the real client's pull labels.
+	f.pinnedImages[ref] = true
 
 	return 100, nil
+}
+
+// InUseImages returns the subset of refs marked as in use.
+func (f *FakeContainerd) InUseImages(ctx context.Context, refs []string) ([]string, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	var inUse []string
+	for _, ref := range refs {
+		if f.inUseImages[ref] {
+			inUse = append(inUse, ref)
+		}
+	}
+	return inUse, nil
+}
+
+// UnpinImage removes ofen's pin from the image.
+func (f *FakeContainerd) UnpinImage(ctx context.Context, ref string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	delete(f.pinnedImages, ref)
+	return nil
+}
+
+// ListPinnedImages returns the names of images pinned by ofen.
+func (f *FakeContainerd) ListPinnedImages(ctx context.Context) ([]string, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	names := make([]string, 0, len(f.pinnedImages))
+	for ref, pinned := range f.pinnedImages {
+		if pinned {
+			names = append(names, ref)
+		}
+	}
+	return names, nil
+}
+
+// SetImageInUse marks whether an image is currently used by a container.
+func (f *FakeContainerd) SetImageInUse(ref string, inUse bool) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.inUseImages[ref] = inUse
+}
+
+// IsImagePinned reports whether the image is currently pinned by ofen.
+func (f *FakeContainerd) IsImagePinned(ref string) bool {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.pinnedImages[ref]
 }
 
 func (f *FakeContainerd) SetPullDelay(delay time.Duration) {

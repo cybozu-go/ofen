@@ -1,0 +1,9 @@
+apiVersion: ofen.cybozu.io/v1
+kind: ImagePrefetch
+metadata:
+  name: e2e-unpin-test
+  namespace: e2e-test
+spec:
+  images:
+    - ghcr.io/cybozu/ubuntu-debug:24.04
+  allNodes: true

@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"time"
 
 	containerd "github.com/containerd/containerd/v2/client"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -150,6 +151,21 @@ func main() {
 	err = mgr.Add(containerdEventWatcher)
 	if err != nil {
 		setupLog.Error(err, "unable to add containerd event watcher")
+		os.Exit(1)
+	}
+
+	// Set up the image unpinner, which removes ofen's pin from images once they are
+	// in use by a Pod or are no longer desired by any NodeImageSet.
+	imageUnpinner := controller.NewImageUnpinner(
+		mgr.GetClient(),
+		containerdClient,
+		ctrl.Log.WithName("image-unpinner"),
+		nodeName,
+		30*time.Second,
+	)
+	err = mgr.Add(imageUnpinner)
+	if err != nil {
+		setupLog.Error(err, "unable to add image unpinner")
 		os.Exit(1)
 	}
 

@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: e2e-pin-consumer
+  namespace: e2e-test
+spec:
+  containers:
+    - name: main
+      image: ghcr.io/cybozu/ubuntu:24.04
+      command: ["sleep", "infinity"]
