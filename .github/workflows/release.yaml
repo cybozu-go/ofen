@@ -59,7 +59,7 @@ jobs:
           if echo ${VERSION} | grep -q -e '-'; then PRERELEASE_FLAG=-p; fi
           gh release create $VERSION $PRERELEASE_FLAG \
             -t "Release $VERSION"  \
-            --generate-notes 
+            --generate-notes
   chart-release:
     permissions:
       contents: write
