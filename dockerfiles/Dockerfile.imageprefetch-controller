@@ -2,17 +2,23 @@
 FROM ghcr.io/cybozu/golang:1.26-noble AS builder
 ARG TARGETOS
 ARG TARGETARCH
+ARG GOPROXY
 
 WORKDIR /workspace
+# the netrc secret carries Takumi Guard credentials when the build is run from CI;
+# it is optional so that local builds without it still work
 RUN --mount=type=cache,target=/go/pkg/mod/,sharing=locked \
     --mount=type=bind,source=go.sum,target=go.sum \
     --mount=type=bind,source=go.mod,target=go.mod \
-    go mod download 
+    --mount=type=secret,id=netrc,target=/root/.netrc \
+    GOPROXY=${GOPROXY} go mod download
 
+# GOPROXY=off: all modules are already in the local cache from `go mod download` above,
+# so this step must not need network access.
 RUN --mount=type=cache,target=/root/.cache/go-build \
     --mount=type=cache,target=/go/pkg/mod \
     --mount=type=bind,target=. \
-    CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -a -o /bin/imageprefetch-controller cmd/imageprefetch-controller/main.go
+    CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} GOPROXY=off go build -a -o /bin/imageprefetch-controller cmd/imageprefetch-controller/main.go
 
 FROM ghcr.io/cybozu/ubuntu:24.04
 LABEL org.opencontainers.image.source="https://github.com/cybozu-go/ofen"
