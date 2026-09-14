@@ -10,6 +10,12 @@ endif
 
 CONTAINER_TOOL ?= docker
 
+DOCKER_BUILD_ARGS := --build-arg GOPROXY=$(shell go env GOPROXY)
+ifneq ($(wildcard $(HOME)/.netrc),)
+# To pass Takumi Guard credentials, mount the .netrc file to the container if it exists.
+DOCKER_BUILD_ARGS += --secret id=netrc,src=$(HOME)/.netrc
+endif
+
 SHELL = /usr/bin/env bash -o pipefail
 .SHELLFLAGS = -ec
 
@@ -90,8 +96,8 @@ run: manifests generate fmt vet ## Run a controller from your host.
 
 .PHONY: docker-build
 docker-build: ## Build docker image with the manager.
-	$(CONTAINER_TOOL) build -t ${IMG_PREFETCH_CONTROLLER} -f ./dockerfiles/Dockerfile.imageprefetch-controller .
-	$(CONTAINER_TOOL) build -t $(IMG_NODEIMAGESET_CONTROLLER) -f ./dockerfiles/Dockerfile.nodeimageset-controller .
+	$(CONTAINER_TOOL) build $(DOCKER_BUILD_ARGS) -t ${IMG_PREFETCH_CONTROLLER} -f ./dockerfiles/Dockerfile.imageprefetch-controller .
+	$(CONTAINER_TOOL) build $(DOCKER_BUILD_ARGS) -t $(IMG_NODEIMAGESET_CONTROLLER) -f ./dockerfiles/Dockerfile.nodeimageset-controller .
 
 .PHONY: docker-push
 docker-push: ## Push docker image with the manager.
