@@ -2,6 +2,7 @@ package controller
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/go-logr/logr"
@@ -54,7 +55,14 @@ func (w *ContainerdEventWatcher) Start(ctx context.Context) error {
 		case <-ctx.Done():
 			w.logger.Info("containerd event watcher stopped")
 			return nil
-		case deleteImageName := <-eventsCh:
+		case deleteImageName, ok := <-eventsCh:
+			if !ok {
+				if ctx.Err() != nil {
+					w.logger.Info("containerd event watcher stopped")
+					return nil
+				}
+				return errors.New("containerd event subscription closed unexpectedly")
+			}
 			if deleteImageName != "" {
 				w.logger.Info("received image deletion event", "imageName", deleteImageName)
 				w.notifyController(ctx, deleteImageName)
