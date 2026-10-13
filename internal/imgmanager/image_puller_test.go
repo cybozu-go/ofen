@@ -654,3 +654,117 @@ func TestImagePullerUpdateNodeImageSetStatus(t *testing.T) {
 		assert.NotNil(t, value)
 	})
 }
+
+func TestImagePullerSubscribeDeleteEventResubscribesAfterContainerdRestart(t *testing.T) {
+	t.Parallel()
+
+	logger := logr.Discard()
+	fakeClient := NewFakeContainerd(nil)
+	puller := NewImagePuller(logger, fakeClient)
+	puller.resubscribeMinInterval = 10 * time.Millisecond
+	puller.resubscribeMaxInterval = 20 * time.Millisecond
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	puller.NewNodeImageSetStatus(testNodeImageSetName)
+	value, ok := puller.status.Load(testNodeImageSetName)
+	require.True(t, ok)
+	nodeStatus := value.(*NodeImageSetStatus)
+	imageStatus := nodeStatus.GetOrCreateImageStatus(testImageName)
+	imageStatus.SetImagePulling(true)
+	imageStatus.SetError(fmt.Errorf("some error"))
+
+	deleteCh, err := puller.SubscribeDeleteEvent(ctx)
+	require.NoError(t, err)
+
+	// containerd closes its socket, which terminates the subscription.
+	fakeClient.SendSubscriptionError(fmt.Errorf("rpc error: code = Unavailable desc = error reading from server: EOF"))
+
+	// The delete event must still be delivered once containerd is back.
+	require.Eventually(t, func() bool {
+		if err := fakeClient.SendDeleteEvent(testImageName); err != nil {
+			return false
+		}
+		select {
+		case deletedImage := <-deleteCh:
+			assert.Equal(t, testImageName, deletedImage)
+			return true
+		case <-time.After(100 * time.Millisecond):
+			return false
+		}
+	}, 3*time.Second, 50*time.Millisecond, "delete event was not delivered after containerd restarted")
+
+	assert.False(t, imageStatus.IsImagePulling())
+	assert.NoError(t, imageStatus.GetError())
+
+	// The subscription must not be closed by the failure.
+	select {
+	case _, open := <-deleteCh:
+		assert.True(t, open, "delete channel must stay open across containerd restarts")
+	default:
+	}
+}
+
+func TestImagePullerSubscribeDeleteEventDoesNotSpinOnSubscriptionError(t *testing.T) {
+	t.Parallel()
+
+	logger := logr.Discard()
+	fakeClient := NewFakeContainerd(nil)
+	puller := NewImagePuller(logger, fakeClient)
+	puller.resubscribeMinInterval = 100 * time.Millisecond
+	puller.resubscribeMaxInterval = 100 * time.Millisecond
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	_, err := puller.SubscribeDeleteEvent(ctx)
+	require.NoError(t, err)
+	require.Eventually(t, func() bool {
+		return fakeClient.SubscribeCount() == 1
+	}, time.Second, 10*time.Millisecond)
+
+	// A terminated subscription must trigger exactly one resubscribe, not a spin.
+	fakeClient.SendSubscriptionError(fmt.Errorf("rpc error: code = Unavailable desc = error reading from server: EOF"))
+
+	require.Eventually(t, func() bool {
+		return fakeClient.SubscribeCount() == 2
+	}, time.Second, 10*time.Millisecond, "subscription was not re-established")
+
+	// No further subscriptions while the new one is healthy.
+	time.Sleep(300 * time.Millisecond)
+	assert.Equal(t, 2, fakeClient.SubscribeCount())
+}
+
+func TestImagePullerSubscribeDeleteEventRetriesWhenResubscribeFails(t *testing.T) {
+	t.Parallel()
+
+	logger := logr.Discard()
+	fakeClient := NewFakeContainerd(nil)
+	puller := NewImagePuller(logger, fakeClient)
+	puller.resubscribeMinInterval = 10 * time.Millisecond
+	puller.resubscribeMaxInterval = 20 * time.Millisecond
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// containerd stays unreachable: the initial subscribe and the next three
+	// retries all fail before it accepts connections again.
+	fakeClient.FailNextSubscribes(4)
+
+	deleteCh, err := puller.SubscribeDeleteEvent(ctx)
+	require.NoError(t, err)
+
+	require.Eventually(t, func() bool {
+		return fakeClient.SubscribeCount() >= 5
+	}, 5*time.Second, 10*time.Millisecond, "failed subscribes must keep being retried")
+
+	// Once containerd is reachable again, events must flow.
+	require.NoError(t, fakeClient.SendDeleteEvent(testImageName))
+	select {
+	case deletedImage := <-deleteCh:
+		assert.Equal(t, testImageName, deletedImage)
+	case <-time.After(3 * time.Second):
+		t.Fatal("delete event was not delivered after containerd became reachable")
+	}
+}

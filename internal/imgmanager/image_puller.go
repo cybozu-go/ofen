@@ -17,6 +17,11 @@ import (
 	ofenv1 "github.com/cybozu-go/ofen/api/v1"
 )
 
+const (
+	defaultResubscribeMinInterval = 1 * time.Second
+	defaultResubscribeMaxInterval = 30 * time.Second
+)
+
 type NodeImageSetStatus struct {
 	Images sync.Map
 }
@@ -141,13 +146,18 @@ type ImagePuller struct {
 	logger           logr.Logger
 	containerdClient ContainerdClient
 	status           sync.Map
+
+	resubscribeMinInterval time.Duration
+	resubscribeMaxInterval time.Duration
 }
 
 func NewImagePuller(logger logr.Logger, containerdClient ContainerdClient) *ImagePuller {
 	return &ImagePuller{
-		logger:           logger,
-		containerdClient: containerdClient,
-		status:           sync.Map{},
+		logger:                 logger,
+		containerdClient:       containerdClient,
+		status:                 sync.Map{},
+		resubscribeMinInterval: defaultResubscribeMinInterval,
+		resubscribeMaxInterval: defaultResubscribeMaxInterval,
 	}
 }
 
@@ -307,49 +317,82 @@ func (p *ImagePuller) GetPullDuration(nodeImageSetName, imageName string) int64 
 	return imageStatus.GetPullDuration()
 }
 
+// SubscribeDeleteEvent delivers each deleted image name, resubscribing if containerd closes it.
 func (p *ImagePuller) SubscribeDeleteEvent(ctx context.Context) (<-chan string, error) {
-	eventsCh, errorCh := p.containerdClient.Subscribe(ctx)
 	imageDeletionCh := make(chan string)
 
 	go func() {
 		defer close(imageDeletionCh)
+
+		eventsCh, errorCh := p.containerdClient.Subscribe(ctx)
+		subscribedAt := time.Now()
+		interval := p.resubscribeMinInterval
+
 		for {
+			if eventsCh == nil {
+				// A long-lived subscription means containerd is healthy again.
+				if time.Since(subscribedAt) >= p.resubscribeMaxInterval {
+					interval = p.resubscribeMinInterval
+				}
+				p.logger.Info("resubscribing to containerd events", "interval", interval)
+				select {
+				case <-ctx.Done():
+					return
+				case <-time.After(interval):
+				}
+				interval = min(interval*2, p.resubscribeMaxInterval)
+
+				eventsCh, errorCh = p.containerdClient.Subscribe(ctx)
+				subscribedAt = time.Now()
+			}
+
 			select {
 			case <-ctx.Done():
 				return
-			case err := <-errorCh:
-				if err != nil {
-					p.logger.Error(err, "failed to receive events from containerd")
+			case err, ok := <-errorCh:
+				if ok && err != nil {
+					p.logger.Error(err, "containerd event subscription failed")
 				}
-			case e := <-eventsCh:
+				eventsCh, errorCh = nil, nil
+			case e, ok := <-eventsCh:
+				if !ok {
+					eventsCh, errorCh = nil, nil
+					continue
+				}
 				deleteImageName, err := handleDeleteEvent(e)
 				if err != nil {
 					p.logger.Error(err, "failed to process containerd delete event", "event", e)
 					continue
 				}
-				if deleteImageName != "" {
-					p.logger.Info("processed image deletion event", "imageName", deleteImageName)
-					p.status.Range(func(key, value interface{}) bool {
-						nodeStatus := value.(*NodeImageSetStatus)
-						if value, ok := nodeStatus.Images.Load(deleteImageName); ok {
-							imageStatus := value.(*ImagePullStatus)
-							imageStatus.SetImagePulling(false)
-							imageStatus.SetError(nil)
-						}
-						return true
-					})
+				if deleteImageName == "" {
+					continue
+				}
 
-					select {
-					case imageDeletionCh <- deleteImageName:
-					case <-ctx.Done():
-						return
-					}
+				p.logger.Info("processed image deletion event", "imageName", deleteImageName)
+				p.resetImageStatus(deleteImageName)
+
+				select {
+				case imageDeletionCh <- deleteImageName:
+				case <-ctx.Done():
+					return
 				}
 			}
 		}
 	}()
 
 	return imageDeletionCh, nil
+}
+
+func (p *ImagePuller) resetImageStatus(imageName string) {
+	p.status.Range(func(key, value any) bool {
+		nodeStatus := value.(*NodeImageSetStatus)
+		if v, ok := nodeStatus.Images.Load(imageName); ok {
+			imageStatus := v.(*ImagePullStatus)
+			imageStatus.SetImagePulling(false)
+			imageStatus.SetError(nil)
+		}
+		return true
+	})
 }
 
 func handleDeleteEvent(e *events.Envelope) (string, error) {
