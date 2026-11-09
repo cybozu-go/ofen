@@ -7,11 +7,15 @@ import (
 	"os"
 
 	containerd "github.com/containerd/containerd/v2/client"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/util/workqueue"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
@@ -21,6 +25,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	ofenv1 "github.com/cybozu-go/ofen/api/v1"
+	"github.com/cybozu-go/ofen/internal/constants"
 	"github.com/cybozu-go/ofen/internal/controller"
 	"github.com/cybozu-go/ofen/internal/imgmanager"
 	"github.com/cybozu-go/ofen/internal/metrics"
@@ -103,24 +108,40 @@ func main() {
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
 		LeaderElectionID:       "08b3b3b1.ofen.cybozu.io",
+		// This controller runs on every node, so it only caches the NodeImageSets for its own node
+		// instead of watching all of them in the cluster.
+		Cache: cache.Options{
+			ByObject: map[client.Object]cache.ByObject{
+				&ofenv1.NodeImageSet{}: {
+					Label: labels.SelectorFromSet(labels.Set{constants.NodeName: nodeName}),
+				},
+			},
+		},
+		// Image pull secrets are read only when pulling an image, so they are read directly from
+		// the API server instead of caching all the secrets in the cluster on every node.
+		Client: client.Options{
+			Cache: &client.CacheOptions{
+				DisableFor: []client.Object{&corev1.Secret{}},
+			},
+		},
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
 		os.Exit(1)
 	}
 
-	client, err := containerd.New(containerdConfig.SockAddr)
+	containerdConn, err := containerd.New(containerdConfig.SockAddr)
 	if err != nil {
 		setupLog.Error(err, "unable to connect to containerd")
 		os.Exit(1)
 	}
 	defer func() {
-		if err := client.Close(); err != nil {
+		if err := containerdConn.Close(); err != nil {
 			setupLog.Error(err, "failed to close containerd client")
 		}
 	}()
 
-	containerdClient := imgmanager.NewContainerd(&containerdConfig, client)
+	containerdClient := imgmanager.NewContainerd(&containerdConfig, containerdConn)
 	imagePuller := imgmanager.NewImagePuller(ctrl.Log.WithName("imagePuller"), containerdClient)
 	ch := make(chan event.TypedGenericEvent[*ofenv1.NodeImageSet])
 	rateLimiter := workqueue.DefaultTypedControllerRateLimiter[imgmanager.Task]()
