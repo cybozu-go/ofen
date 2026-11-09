@@ -123,11 +123,12 @@ func registryMirrorHosts(ctx context.Context, hostOpt config.HostOptions) docker
 			return nil, err
 		}
 
+		if len(rhosts) > 0 {
+			rhosts = rhosts[:len(rhosts)-1]
+		}
+
 		mirrorHosts := []docker.RegistryHost{}
 		for _, rhost := range rhosts {
-			if rhost.Host == host {
-				continue
-			}
 			if !rhost.Capabilities.Has(docker.HostCapabilityPull) {
 				logger.Info("skipping registry host without pull capability", "host", rhost.Host)
 				continue
