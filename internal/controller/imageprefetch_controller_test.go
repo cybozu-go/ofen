@@ -1186,3 +1186,31 @@ func updateNodeImageSetStatusToImageAvailable(ctx context.Context, namespace str
 		return fmt.Errorf("only %d NodeImageSets updated, desired %d", count, desired)
 	}).Should(Succeed())
 }
+
+var _ = Describe("newCondition", func() {
+	lastTransitionTime := metav1.NewTime(time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC))
+	current := []metav1.Condition{
+		{
+			Type:               ofenv1.ConditionReady,
+			Status:             metav1.ConditionFalse,
+			Reason:             "ImagePrefetchProgressing",
+			Message:            "Waiting for all nodes to pull the image",
+			LastTransitionTime: lastTransitionTime,
+		},
+	}
+
+	It("should keep the last transition time if the status does not change", func() {
+		condition := newCondition(current, ofenv1.ConditionReady, metav1.ConditionFalse, "ImagePrefetchProgressing", "Waiting for all nodes to pull the image")
+		Expect(*condition.LastTransitionTime).To(Equal(lastTransitionTime))
+	})
+
+	It("should update the last transition time if the status changes", func() {
+		condition := newCondition(current, ofenv1.ConditionReady, metav1.ConditionTrue, "ImagePrefetchReady", "All nodes have the desired image")
+		Expect(condition.LastTransitionTime.After(lastTransitionTime.Time)).To(BeTrue())
+	})
+
+	It("should set the last transition time if the condition does not exist", func() {
+		condition := newCondition(current, ofenv1.ConditionNoImagePullFailed, metav1.ConditionTrue, "NoImagePullFailed", "No nodes have failed to pull the image")
+		Expect(condition.LastTransitionTime.After(lastTransitionTime.Time)).To(BeTrue())
+	})
+})
