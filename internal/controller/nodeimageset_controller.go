@@ -27,6 +27,10 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
+// nodeImageSetResyncInterval is the interval to requeue a NodeImageSet whose images are not ready yet.
+// The runner triggers the reconciliation when it finishes pulling an image, so this is only a fallback.
+const nodeImageSetResyncInterval = time.Minute
+
 // NodeImageSetReconciler reconciles a NodeImageSet object
 type NodeImageSetReconciler struct {
 	client.Client
@@ -137,7 +141,7 @@ func (r *NodeImageSetReconciler) collectPendingImages(ctx context.Context, nodeI
 func (r *NodeImageSetReconciler) updateStatus(ctx context.Context, nodeImageSet *ofenv1.NodeImageSet) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 	logger.Info("updating NodeImageSet status")
-	result := ctrl.Result{RequeueAfter: 10 * time.Second}
+	result := ctrl.Result{RequeueAfter: nodeImageSetResyncInterval}
 
 	// If nodeimageset has been updated, remove metrics for deleted images
 	if nodeImageSet.Generation != nodeImageSet.Status.ObservedGeneration {
