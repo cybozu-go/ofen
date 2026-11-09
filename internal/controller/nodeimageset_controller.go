@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -85,29 +83,13 @@ func (r *NodeImageSetReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{Requeue: true}, nil
 	}
 
-	if err := r.reconcileNodeImageSet(ctx, &nodeImageSet); err != nil {
-		return ctrl.Result{}, err
-	}
+	r.reconcileNodeImageSet(ctx, &nodeImageSet)
 
 	return r.updateStatus(ctx, &nodeImageSet)
 }
 
-func (r *NodeImageSetReconciler) reconcileNodeImageSet(ctx context.Context, nodeImageSet *ofenv1.NodeImageSet) error {
+func (r *NodeImageSetReconciler) reconcileNodeImageSet(ctx context.Context, nodeImageSet *ofenv1.NodeImageSet) {
 	logger := log.FromContext(ctx)
-
-	imagePrefetchNamespace := nodeImageSet.Labels[constants.OwnerImagePrefetchNamespace]
-	secrets := make([]corev1.Secret, 0, len(nodeImageSet.Spec.ImagePullSecrets))
-	for _, secretRef := range nodeImageSet.Spec.ImagePullSecrets {
-		var secret corev1.Secret
-		err := r.Get(ctx, client.ObjectKey{Namespace: imagePrefetchNamespace, Name: secretRef.Name}, &secret)
-		if apierrors.IsNotFound(err) {
-			continue
-		} else if err != nil {
-			logger.Error(err, "failed to get image pull secret", "secret", secretRef.Name)
-			return err
-		}
-		secrets = append(secrets, secret)
-	}
 
 	if !r.ImagePuller.IsExistsNodeImageSetStatus(nodeImageSet.Name) {
 		logger.Info("initializing NodeImageSet status")
@@ -121,20 +103,15 @@ func (r *NodeImageSetReconciler) reconcileNodeImageSet(ctx context.Context, node
 	pendingImages := r.collectPendingImages(ctx, nodeImageSet)
 	if len(pendingImages) == 0 {
 		logger.Info("no images to process")
-		return nil
+		return
 	}
 
 	for _, image := range pendingImages {
-		task := imgmanager.Task{
-			Ref:            image,
-			RegistryPolicy: nodeImageSet.Spec.RegistryPolicy,
-			NodeImageSet:   nodeImageSet,
-			Secrets:        &secrets,
-		}
-		r.Queue.Add(task)
+		r.Queue.Add(imgmanager.Task{
+			NodeImageSetName: nodeImageSet.Name,
+			Ref:              image,
+		})
 	}
-
-	return nil
 }
 
 func (r *NodeImageSetReconciler) collectPendingImages(ctx context.Context, nodeImageSet *ofenv1.NodeImageSet) []string {
