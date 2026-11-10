@@ -127,6 +127,7 @@ func main() {
 	queue := workqueue.NewTypedRateLimitingQueue(rateLimiter)
 
 	runner := controller.NewRunner(
+		mgr.GetClient(),
 		imagePuller,
 		ctrl.Log.WithName("runner").WithValues("nodeName", nodeName),
 		queue,
