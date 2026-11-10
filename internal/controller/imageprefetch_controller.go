@@ -401,63 +401,33 @@ func (r *ImagePrefetchReconciler) updateStatus(ctx context.Context, imgPrefetch 
 
 	if len(nodeImageSets.Items) == len(selectedNodes) {
 		imgPrefetchSSA.Status.WithConditions(
-			metav1apply.Condition().
-				WithType(ofenv1.ConditionNodeImageSetsCreated).
-				WithStatus(metav1.ConditionTrue).
-				WithReason("NodeImageSetsCreated").
-				WithMessage("All NodeImageSets have been created").
-				WithLastTransitionTime(metav1.Now()),
+			newCondition(imgPrefetch.Status.Conditions, ofenv1.ConditionNodeImageSetsCreated, metav1.ConditionTrue, "NodeImageSetsCreated", "All NodeImageSets have been created"),
 		)
 	} else {
 		imgPrefetchSSA.Status.WithConditions(
-			metav1apply.Condition().
-				WithType(ofenv1.ConditionNodeImageSetsCreated).
-				WithStatus(metav1.ConditionFalse).
-				WithReason("NodeImageSetsCreating").
-				WithMessage("Waiting for all NodeImageSets to be created").
-				WithLastTransitionTime(metav1.Now()),
+			newCondition(imgPrefetch.Status.Conditions, ofenv1.ConditionNodeImageSetsCreated, metav1.ConditionFalse, "NodeImageSetsCreating", "Waiting for all NodeImageSets to be created"),
 		)
 	}
 
 	if status.availableNodes == status.desiredNodes {
 		logger.Info("ImagePrefetch is ready", "name", imgPrefetch.Name)
 		imgPrefetchSSA.Status.WithConditions(
-			metav1apply.Condition().
-				WithType(ofenv1.ConditionReady).
-				WithStatus(metav1.ConditionTrue).
-				WithReason("ImagePrefetchReady").
-				WithMessage("All nodes have the desired image").
-				WithLastTransitionTime(metav1.Now()),
+			newCondition(imgPrefetch.Status.Conditions, ofenv1.ConditionReady, metav1.ConditionTrue, "ImagePrefetchReady", "All nodes have the desired image"),
 		)
 		result = ctrl.Result{}
 	} else {
 		imgPrefetchSSA.Status.WithConditions(
-			metav1apply.Condition().
-				WithType(ofenv1.ConditionReady).
-				WithStatus(metav1.ConditionFalse).
-				WithReason("ImagePrefetchProgressing").
-				WithMessage("Waiting for all nodes to pull the image").
-				WithLastTransitionTime(metav1.Now()),
+			newCondition(imgPrefetch.Status.Conditions, ofenv1.ConditionReady, metav1.ConditionFalse, "ImagePrefetchProgressing", "Waiting for all nodes to pull the image"),
 		)
 	}
 
 	if status.pullFailedNodes > 0 {
 		imgPrefetchSSA.Status.WithConditions(
-			metav1apply.Condition().
-				WithType(ofenv1.ConditionNoImagePullFailed).
-				WithStatus(metav1.ConditionFalse).
-				WithReason("ImagePrefetchFailed").
-				WithMessage("Some nodes failed to pull the image").
-				WithLastTransitionTime(metav1.Now()),
+			newCondition(imgPrefetch.Status.Conditions, ofenv1.ConditionNoImagePullFailed, metav1.ConditionFalse, "ImagePrefetchFailed", "Some nodes failed to pull the image"),
 		)
 	} else {
 		imgPrefetchSSA.Status.WithConditions(
-			metav1apply.Condition().
-				WithType(ofenv1.ConditionNoImagePullFailed).
-				WithStatus(metav1.ConditionTrue).
-				WithReason("NoImagePullFailed").
-				WithMessage("No nodes have failed to pull the image").
-				WithLastTransitionTime(metav1.Now()),
+			newCondition(imgPrefetch.Status.Conditions, ofenv1.ConditionNoImagePullFailed, metav1.ConditionTrue, "NoImagePullFailed", "No nodes have failed to pull the image"),
 		)
 	}
 
@@ -468,6 +438,20 @@ func (r *ImagePrefetchReconciler) updateStatus(ctx context.Context, imgPrefetch 
 	r.setMetrics(imgPrefetch)
 
 	return result, nil
+}
+
+func newCondition(current []metav1.Condition, conditionType string, status metav1.ConditionStatus, reason, message string) *metav1apply.ConditionApplyConfiguration {
+	lastTransitionTime := metav1.Now()
+	if c := meta.FindStatusCondition(current, conditionType); c != nil && c.Status == status {
+		lastTransitionTime = c.LastTransitionTime
+	}
+
+	return metav1apply.Condition().
+		WithType(conditionType).
+		WithStatus(status).
+		WithReason(reason).
+		WithMessage(message).
+		WithLastTransitionTime(lastTransitionTime)
 }
 
 type NodeImageSetStatus struct {
