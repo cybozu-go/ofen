@@ -121,6 +121,18 @@ server = "https://proxy.registry.example"
 			expectedHosts: []string{"localhost:5000"},
 		},
 		{
+			name:         "upstream also listed as host",
+			registryName: "ghcr.io",
+			registryConfig: `
+server = "https://ghcr.io"
+[host."http://localhost:5000"]
+  capabilities = ["pull", "resolve"]
+[host."https://ghcr.io"]
+  capabilities = ["pull", "resolve"]
+`,
+			expectedHosts: []string{"localhost:5000"},
+		},
+		{
 			name:           "no registry config",
 			registryName:   "test.registry.example",
 			registryConfig: "",
