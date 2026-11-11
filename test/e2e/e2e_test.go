@@ -19,6 +19,7 @@ package e2e
 import (
 	"bytes"
 	"fmt"
+	"os"
 	"os/exec"
 	"strings"
 	"time"
@@ -42,8 +43,18 @@ func execWrapper(cmd string, input []byte, args ...string) ([]byte, []byte, erro
 	return stdout.Bytes(), stderr.Bytes(), err
 }
 
+// kubectlPath is the path of kubectl. test/e2e/Makefile specifies it with the KUBECTL environment variable.
+var kubectlPath string
+
+func init() {
+	kubectlPath = os.Getenv("KUBECTL")
+	if kubectlPath == "" {
+		kubectlPath = "kubectl"
+	}
+}
+
 func kubectl(args ...string) ([]byte, []byte, error) {
-	return execWrapper("kubectl", nil, args...)
+	return execWrapper(kubectlPath, nil, args...)
 }
 
 func GetNonEmptyLines(output string) []string {

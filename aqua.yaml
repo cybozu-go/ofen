@@ -1,25 +1,33 @@
 ---
+# aqua - Declarative CLI Version Manager
+# https://aquaproj.github.io/
+#
+# The standard registry and the packages except for controller-gen, setup-envtest, kubectl and models-schema
+# are updated by `make maintenance`. The others are updated manually. See docs/maintenance.md.
 # yaml-language-server: $schema=https://raw.githubusercontent.com/aquaproj/aqua/main/json-schema/aqua-yaml.json
 registries:
   - type: standard
-    ref: v4.494.1
+    ref: v4.579.0
   - type: local
     name: local
     path: registry.yaml
-
 checksum:
   enabled: true
-  required_checksum: true
-
+  require_checksum: true
+  supported_envs:
+    - darwin
+    - linux
 packages:
+  - name: cli/cli@v2.103.3
+  - name: helm/helm@v4.3.1
   - name: golangci/golangci-lint@v2.11.4
-  - name: mikefarah/yq@v4.52.5
-  - name: kubernetes-sigs/kind@v0.31.0
-  - name: kubernetes-sigs/kustomize@kustomize/v5.8.1
+  - name: mikefarah/yq@v4.54.1
+  - name: kubernetes-sigs/kind@v0.33.0
+  - name: kubernetes-sigs/kustomize@kustomize/v5.8.3
   - name: kubernetes-sigs/controller-tools/controller-gen@v0.20.1
   - name: kubernetes-sigs/controller-runtime/setup-envtest@v0.23.3
   - name: kubernetes/kubernetes/kubectl@v1.35.3
-  - name: rust-lang/mdBook@v0.5.2
+  - name: rust-lang/mdBook@v0.5.4
   - name: pfnet/kaptest@v0.1.2
     registry: local
   - name: kubernetes/kubernetes/pkg/generated/openapi/cmd/models-schema@v1.35.4

@@ -1,5 +1,5 @@
 include ./Makefile.common
-ENVTEST_K8S_VERSION = 1.35.0
+include ./Makefile.versions
 
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
@@ -32,14 +32,14 @@ manifests: ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefin
 	echo '{{- if .Values.crds.enabled }}' > charts/ofen/templates/generated/crds/crds.yaml
 	$(KUSTOMIZE) build config/kustomize-to-helm/overlays/crds | $(YQ) e "." - >> charts/ofen/templates/generated/crds/crds.yaml
 	echo '{{- end }}' >> charts/ofen/templates/generated/crds/crds.yaml
-	$(KUSTOMIZE) build config/kustomize-to-helm/overlays/templates | yq e "."  -p yaml - > charts/ofen/templates/generated/generated.yaml
+	$(KUSTOMIZE) build config/kustomize-to-helm/overlays/templates | $(YQ) e "." -p yaml - > charts/ofen/templates/generated/generated.yaml
 
 .PHONY: generate
 generate: ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
 
-.PHONY: check-generate
-check-generate:
+.PHONY: check-generated
+check-generated:
 	$(MAKE) manifests generate k8s-client-gen
 	git diff --exit-code --name-only
 
@@ -144,18 +144,103 @@ $(LOCALBIN):
 	mkdir -p $(LOCALBIN)
 
 ## Tool Binaries
-KUBECTL ?= kubectl
-KUSTOMIZE ?= kustomize
-CONTROLLER_GEN ?= controller-gen
-ENVTEST ?= setup-envtest
-GOLANGCI_LINT ?= golangci-lint
+# The CLI tools managed by aqua are defined in Makefile.common.
 GINKGO ?= go tool ginkgo
 APPLYCONFIGURATION_GEN ?= go tool applyconfiguration-gen
-MODELS_SCHEMA ?= models-schema
-KAPTEST ?= kaptest
-YQ ?= yq
+
+##@ Maintenance
+
+# Only versions released at least COOLDOWN_DAYS days ago are adopted.
+# In the jq filters below, timestamps are in seconds, so days are converted with 86400 (= 60 * 60 * 24 seconds per day).
+COOLDOWN_DAYS ?= 14
+
+# usage: get-latest-gh OWNER/REPO [TAG_PREFIX]
+# Get the highest version tag of the releases (excluding drafts and pre-releases) published at least COOLDOWN_DAYS days ago.
+# If TAG_PREFIX is specified, only tags starting with it are considered.
+# Only tags in the form of TAG_PREFIX + "[v]X.Y.Z" are considered, because some projects (e.g. spegel)
+# do not mark release candidates such as "v0.8.0-rc.1" as pre-releases.
+# The tags are compared as versions instead of the publication dates,
+# because some projects (e.g. helm) publish patch releases of older major versions after newer ones.
+define get-latest-gh
+$(eval latest_gh := $(shell $(GH) release list --repo $1 --limit 100 --json tagName,publishedAt,isDraft,isPrerelease \
+	--jq '[.[] | select(.isDraft | not) | select(.isPrerelease | not) | select((.publishedAt | fromdateiso8601) < (now - $(COOLDOWN_DAYS) * 86400)) | .tagName | select(startswith("$2")) | select(ltrimstr("$2") | test("^v?[0-9]+(\\.[0-9]+)*$$"))] | sort_by(ltrimstr("$2") | ltrimstr("v") | split(".") | map(tonumber)) | last // empty'))
+$(if $(latest_gh),,$(error failed to get the latest release of $1))
+endef
+
+# usage: major-prefix VERSION
+# Get the prefix of VERSION up to the major version (e.g. "v2." for "v2.11.4", "kustomize/v5." for "kustomize/v5.8.3").
+# It is passed to get-latest-gh as TAG_PREFIX to keep the major version, because major version upgrades may
+# have breaking changes and should be done manually. Note that minor version upgrades are adopted for v0.x.
+major-prefix = $(shell echo '$1' | sed -E 's/^([^0-9]*[0-9]+\.).*/\1/')
+
+# usage: aqua-package-version PACKAGE
+# Get the current version of PACKAGE in aqua.yaml.
+aqua-package-version = $(shell $(YQ) '.packages[].name | select(test("^$1@")) | sub("^$1@"; "")' aqua.yaml)
+
+# usage: aqua-package-update-expr PACKAGE
+# Get the yq expression to update PACKAGE in aqua.yaml to the latest version with the same major version.
+# PACKAGE must be the same as the GitHub repository name.
+aqua-package-update-expr = $(strip \
+	$(call get-latest-gh,$1,$(call major-prefix,$(call aqua-package-version,$1))) \
+	(.packages[] | select(.name | test("^$1@"))).name = "$1@$(latest_gh)")
+
+# The yq expression to update the aqua standard registry in aqua.yaml to the latest version with the same major version.
+aqua-registry-update-expr = $(strip \
+	$(call get-latest-gh,aquaproj/aqua-registry,$(call major-prefix,$(AQUA_REGISTRY_VERSION))) \
+	(.registries[] | select(.type == "standard")).ref = "$(latest_gh)")
+
+# Packages in aqua.yaml updated by `make maintenance`.
+# The others depend on the Kubernetes version and are updated manually. See docs/maintenance.md.
+AQUA_MAINTAINED_PACKAGES := \
+	cli/cli \
+	mikefarah/yq \
+	helm/helm \
+	golangci/golangci-lint \
+	kubernetes-sigs/kind \
+	kubernetes-sigs/kustomize \
+	rust-lang/mdBook \
+	pfnet/kaptest
+
+AQUA_REGISTRY_VERSION = $(shell $(YQ) '.registries[] | select(.type == "standard") | .ref' aqua.yaml)
+AQUA_VERSION = $(shell sed -n -E 's/^ *aqua_version: (.*)$$/\1/p' .github/workflows/ci.yaml | head -n 1)
+
+# update-aqua is completed first, because the other targets use the tools updated by it.
+.PHONY: maintenance
+maintenance: ## Update the tools and the dependencies for development and tests.
+	$(MAKE) update-aqua
+	$(MAKE) update-spegel
+
+# GNU make expands the whole recipe before executing its first line.
+# So, all the latest versions are retrieved with the current gh and yq before any file is modified.
+# aqua.yaml is updated with a single yq command, because aqua cannot execute a new version of yq
+# until its checksum is recorded in aqua-checksums.json.
+.PHONY: update-aqua
+update-aqua: login-gh ## Update the aqua standard registry, the packages in aqua.yaml and the aqua version in CI.
+	$(YQ) -i '$(foreach p,$(AQUA_MAINTAINED_PACKAGES),$(call aqua-package-update-expr,$p) |) $(aqua-registry-update-expr)' aqua.yaml
+	$(call get-latest-gh,aquaproj/aqua,$(call major-prefix,$(AQUA_VERSION)))
+	sed -i -e 's/aqua_version: .*/aqua_version: $(latest_gh)/' .github/workflows/*.yaml
+	aqua update-checksum -prune
+	aqua install -l
+
+.PHONY: update-spegel
+update-spegel: login-gh ## Update the Spegel version used in e2e tests.
+	$(call get-latest-gh,spegel-org/spegel,$(call major-prefix,v$(SPEGEL_VERSION)))
+	sed -i -e 's/^SPEGEL_VERSION := .*/SPEGEL_VERSION := $(patsubst v%,%,$(latest_gh))/' Makefile.versions
+
+.PHONY: login-gh
+login-gh:
+	if ! $(GH) auth status 2>/dev/null; then \
+		echo; \
+		echo '!! You need login to GitHub to proceed. Please follow the next command with "Authenticate Git with your GitHub credentials? (Y)".'; \
+		echo; \
+		$(GH) auth login -h github.com -p HTTPS -w; \
+	fi
+
+.PHONY: logout-gh
+logout-gh:
+	$(GH) auth logout
 
 .PHONY: book
 book:
 	rm -rf docs/book
-	cd docs; mdbook build
+	cd docs; $(MDBOOK) build

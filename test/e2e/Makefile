@@ -1,12 +1,7 @@
 include ../../Makefile.common
-E2ETEST_K8S_VERSION  := 1.35.0
-E2ETEST_KINDEST_NODE_IMAGE_HASH := sha256:4613778f3cfcd10e615029370f5786704559103cf27bef934597ba562b269661
-SPEGEL_VERSION := 0.6.0
+include ../../Makefile.versions
 
 PROJECT_DIR := $(CURDIR)/../../
-
-KUBECTL ?= kubectl
-KIND ?= kind
 
 KIND_CLUSTER_NAME := ofen
 KIND_CONFIG := kind-config.yaml
@@ -34,7 +29,7 @@ start:
 	$(MAKE) kind-load
 	$(KUBECTL) apply -k ../../config/default
 	$(KUBECTL) -n ofen-system wait --for=condition=available --timeout=180s --all deployments
-	helm upgrade --create-namespace --namespace spegel --install spegel --set image.tag=$(SPEGEL_VERSION) \
+	$(HELM) upgrade --create-namespace --namespace spegel --install spegel --version $(SPEGEL_VERSION) \
 		oci://ghcr.io/spegel-org/helm-charts/spegel --wait
 
 .PHONY: kind-load
@@ -42,9 +37,13 @@ kind-load:
 	$(KIND) load docker-image $(IMG_PREFETCH_CONTROLLER) --name ${KIND_CLUSTER_NAME}
 	$(KIND) load docker-image $(IMG_NODEIMAGESET_CONTROLLER) --name ${KIND_CLUSTER_NAME}
 
+# The path of kubectl is passed to the tests with the KUBECTL environment variable.
+# `aqua which` only resolves the path and does not install the package, so kubectl is executed once to install it.
 .PHONY: test
 test:
-	go test -v -race . -ginkgo.v -ginkgo.fail-fast
+	$(KUBECTL) version --client > /dev/null
+	env KUBECTL="$$(aqua which kubectl)" \
+		go test -v -race . -ginkgo.v -ginkgo.fail-fast
 
 .PHONY: logs
 logs:
@@ -54,4 +53,4 @@ logs:
 .PHONY: stop
 stop:
 	$(KIND) delete cluster --name=$(KIND_CLUSTER_NAME)
-	-docker image rm image-prefetch:dev
+	-docker image rm $(IMG_PREFETCH_CONTROLLER) $(IMG_NODEIMAGESET_CONTROLLER)

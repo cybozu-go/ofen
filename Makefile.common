@@ -1,3 +1,18 @@
 IMG_TAG ?= dev
 IMG_PREFETCH_CONTROLLER ?= imageprefetch-controller:$(IMG_TAG)
 IMG_NODEIMAGESET_CONTROLLER ?= nodeimageset-controller:$(IMG_TAG)
+
+# CLI tools are managed by aqua. See aqua.yaml.
+# They are executed via `aqua exec` with the versions in aqua.yaml, so PATH does not need to be configured.
+CONTROLLER_GEN ?= aqua exec -- controller-gen
+ENVTEST ?= aqua exec -- setup-envtest
+GH ?= aqua exec -- gh
+GOLANGCI_LINT ?= aqua exec -- golangci-lint
+HELM ?= aqua exec -- helm
+KAPTEST ?= aqua exec -- kaptest
+KIND ?= aqua exec -- kind
+KUBECTL ?= aqua exec -- kubectl
+KUSTOMIZE ?= aqua exec -- kustomize
+MDBOOK ?= aqua exec -- mdbook
+MODELS_SCHEMA ?= aqua exec -- models-schema
+YQ ?= aqua exec -- yq
