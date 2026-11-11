@@ -123,7 +123,3 @@ type NodeImageSetList struct {
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []NodeImageSet `json:"items"`
 }
-
-func init() {
-	SchemeBuilder.Register(&NodeImageSet{}, &NodeImageSetList{})
-}

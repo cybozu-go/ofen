@@ -95,7 +95,3 @@ type ImagePrefetchList struct {
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []ImagePrefetch `json:"items"`
 }
-
-func init() {
-	SchemeBuilder.Register(&ImagePrefetch{}, &ImagePrefetchList{})
-}
