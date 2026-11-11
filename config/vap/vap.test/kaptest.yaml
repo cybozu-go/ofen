@@ -1,10 +1,13 @@
-validatingAdmissionPolicies:
+version: v1alpha1
+policies:
 - ../vap.yaml
+# Skip the schema validation, because it requires JSON schemas generated from the CRDs.
+skipSchemaValidation: true
 resources:
 - imageprefetch-resources.yaml
 - nodeimageset-resources.yaml
 - params.yaml
-testSuites:
+vapTestSuites:
 - policy: imageprefetch-validation.cybozu.io
   tests:
   # images must not be empty
