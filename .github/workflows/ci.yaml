@@ -21,7 +21,7 @@ jobs:
         bot-id: "${{ vars.TAKUMI_GUARD_BOT_ID }}"
     - uses: aquaproj/aqua-installer@11dd79b4e498d471a9385aa9fb7f62bb5f52a73c # v4.0.4
       with:
-        aqua_version: v2.57.1
+        aqua_version: v2.65.2
     - run: make setup
     - run: make lint
     - run: make build
@@ -38,10 +38,10 @@ jobs:
         bot-id: "${{ vars.TAKUMI_GUARD_BOT_ID }}"
     - uses: aquaproj/aqua-installer@11dd79b4e498d471a9385aa9fb7f62bb5f52a73c # v4.0.4
       with:
-        aqua_version: v2.57.1
+        aqua_version: v2.65.2
     - run: make setup
     - run: make test
-    - run: make check-generate
+    - run: make check-generated
   e2e:
     name: End-to-end tests
     runs-on: ubuntu-24.04
@@ -55,7 +55,7 @@ jobs:
         bot-id: "${{ vars.TAKUMI_GUARD_BOT_ID }}"
     - uses: aquaproj/aqua-installer@11dd79b4e498d471a9385aa9fb7f62bb5f52a73c # v4.0.4
       with:
-        aqua_version: v2.57.1
+        aqua_version: v2.65.2
     - run: make setup
       working-directory: test/e2e
     - run: make start

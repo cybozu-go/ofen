@@ -275,7 +275,6 @@ metadata:
     app.kubernetes.io/version: '{{ .Chart.AppVersion }}'
     helm.sh/chart: '{{ include "ofen.chart" . }}'
   name: '{{ template "ofen.fullname" . }}-imageprefetch-validation.cybozu.io'
-  namespace: '{{ .Release.Namespace }}'
 spec:
   failurePolicy: Fail
   matchConstraints:
@@ -327,7 +326,6 @@ metadata:
     app.kubernetes.io/version: '{{ .Chart.AppVersion }}'
     helm.sh/chart: '{{ include "ofen.chart" . }}'
   name: '{{ template "ofen.fullname" . }}-nodeimageset-validation.cybozu.io'
-  namespace: '{{ .Release.Namespace }}'
 spec:
   failurePolicy: Fail
   matchConstraints:
@@ -370,7 +368,6 @@ metadata:
     app.kubernetes.io/version: '{{ .Chart.AppVersion }}'
     helm.sh/chart: '{{ include "ofen.chart" . }}'
   name: '{{ template "ofen.fullname" . }}-imageprefetch-validation.cybozu.io'
-  namespace: '{{ .Release.Namespace }}'
 spec:
   paramRef:
     name: '{{ template "ofen.fullname" . }}-registry-allowlist'
@@ -389,7 +386,6 @@ metadata:
     app.kubernetes.io/version: '{{ .Chart.AppVersion }}'
     helm.sh/chart: '{{ include "ofen.chart" . }}'
   name: '{{ template "ofen.fullname" . }}-nodeimageset-validation.cybozu.io'
-  namespace: '{{ .Release.Namespace }}'
 spec:
   paramRef:
     name: '{{ template "ofen.fullname" . }}-registry-allowlist'
