@@ -16,8 +16,8 @@
         <link rel="icon" href="favicon-de23e50b.svg">
         <link rel="shortcut icon" href="favicon-8114d1fc.png">
         <link rel="stylesheet" href="css/variables-8adf115d.css">
-        <link rel="stylesheet" href="css/general-2459343d.css">
-        <link rel="stylesheet" href="css/chrome-ae938929.css">
+        <link rel="stylesheet" href="css/general-e96d0476.css">
+        <link rel="stylesheet" href="css/chrome-d279d366.css">
         <link rel="stylesheet" href="css/print-9e4910d8.css" media="print">
 
         <!-- Fonts -->
@@ -36,10 +36,10 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-d2366ca6.js";
+            window.path_to_searchindex_js = "searchindex-6ae9910c.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-90192cb0.js"></script>
+        <script src="toc-f8c86bdd.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -455,15 +455,57 @@ $ git push origin "v$VERSION"
 create a new GitHub release.</p>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="maintenance"><a class="header" href="#maintenance">Maintenance</a></h1>
+<h2 id="prerequisites"><a class="header" href="#prerequisites">Prerequisites</a></h2>
+<p>CLI tools for development and tests are managed by <a href="https://aquaproj.github.io/">aqua</a> in <code>aqua.yaml</code>.
+Their checksums are recorded in <code>aqua-checksums.json</code> and verified on installation.
+The Makefiles execute the tools via <code>aqua exec</code>, so install aqua in advance and put the <code>aqua</code> command in a directory included in <code>PATH</code>.
+See <a href="https://aquaproj.github.io/docs/install">Install aqua</a> for details.
+Then run <code>make setup</code> to install the tools.</p>
+<h2 id="how-to-update-tools-and-dependencies"><a class="header" href="#how-to-update-tools-and-dependencies">How to update tools and dependencies</a></h2>
+<p>Run the following command regularly.</p>
+<pre><code class="language-console">$ make maintenance
+</code></pre>
+<p>This updates the following:</p>
+<ul>
+<li>gh, helm, golangci-lint, yq, kind, kustomize, mdBook, kaptest and the aqua standard registry in <code>aqua.yaml</code>, and <code>aqua-checksums.json</code></li>
+<li>aqua version in <code>.github/workflows/*.yaml</code></li>
+<li><code>SPEGEL_VERSION</code> in <code>Makefile.versions</code></li>
+</ul>
+<p>Only versions released at least 14 days ago are adopted.
+The cooldown period can be changed with <code>COOLDOWN_DAYS</code> (e.g. <code>make maintenance COOLDOWN_DAYS=7</code>).</p>
+<p>The major versions are kept, because major version upgrades may have breaking changes.
+Upgrade them manually (see <a href="#notes-on-editing-aquayaml-manually">Notes on editing aqua.yaml manually</a>).
+Note that minor version upgrades are adopted for <code>v0.x</code>.</p>
+<p>The other packages in <code>aqua.yaml</code> (controller-gen, setup-envtest, kubectl and models-schema) depend on the Kubernetes version.
+Update them with the following procedure.</p>
 <h2 id="how-to-update-supported-kubernetes"><a class="header" href="#how-to-update-supported-kubernetes">How to update supported Kubernetes</a></h2>
 <p>ofen supports the three latest Kubernetes versions. To update the supported Kubernetes versions, please follow the steps below:</p>
 <ol>
-<li>Update <code>ENVTEST_K8S_VERSION</code> in <code>Makefile</code>.</li>
-<li>Update <code>E2ETEST_K8S_VERSION</code> and <code>E2ETEST_KINDEST_NODE_IMAGE_HASH</code> in <code>test/e2e/Makefile</code>.</li>
+<li>Update <code>ENVTEST_K8S_VERSION</code> in <code>Makefile.versions</code>.</li>
+<li>Update <code>E2ETEST_K8S_VERSION</code> and <code>E2ETEST_KINDEST_NODE_IMAGE_HASH</code> in <code>Makefile.versions</code>.
+Specify the version of <code>kindest/node</code> supported by the kind written in <code>aqua.yaml</code>.</li>
 <li>Update <code>k8s.io/*</code> and <code>sigs.k8s.io/controller-runtime</code> packages in <code>go.mod</code>.</li>
-<li>Update <code>aqua.yaml</code> by running <code>aqua update --select-version</code>.</li>
-<li>Run <code>aqua update-checksum</code> to update <code>aqua-checksums.json</code>.</li>
+<li>Update the following packages in <code>aqua.yaml</code> manually.
+<ul>
+<li><code>kubernetes-sigs/controller-tools/controller-gen</code>: the version supporting the Kubernetes version</li>
+<li><code>kubernetes-sigs/controller-runtime/setup-envtest</code>: the same version as controller-runtime in <code>go.mod</code></li>
+<li><code>kubernetes/kubernetes/kubectl</code>: the same minor version as <code>E2ETEST_K8S_VERSION</code></li>
+<li><code>kubernetes/kubernetes/pkg/generated/openapi/cmd/models-schema</code>: the same version as <code>k8s.io/api</code> in <code>go.mod</code></li>
+</ul>
+</li>
+<li>Update <code>aqua-checksums.json</code>. See also <a href="#notes-on-editing-aquayaml-manually">Notes on editing aqua.yaml manually</a>.
+<pre><code class="language-console">$ aqua update-checksum -prune
+</code></pre>
+</li>
 </ol>
+<h2 id="notes-on-editing-aquayaml-manually"><a class="header" href="#notes-on-editing-aquayaml-manually">Notes on editing aqua.yaml manually</a></h2>
+<ul>
+<li>Write the version as the tag name, including its prefix if any (e.g. <code>kubernetes-sigs/kustomize@kustomize/v5.8.3</code>).</li>
+<li>You can select a version interactively with <code>aqua update -s &lt;package&gt;</code> (e.g. <code>aqua update -s kubernetes/kubernetes/kubectl</code>).
+Do not run <code>aqua update</code> without arguments, because it updates all packages to the latest versions ignoring the cooldown period and the major versions.</li>
+<li>Since <code>require_checksum</code> is enabled, packages without checksums fail to install.
+After editing, update <code>aqua-checksums.json</code> with <code>aqua update-checksum -prune</code>.</li>
+</ul>
 
                     </main>
 
@@ -497,11 +539,11 @@ create a new GitHub release.</p>
 
         <script src="elasticlunr-ef4e11c1.min.js"></script>
         <script src="mark-09e88c2c.min.js"></script>
-        <script src="searcher-c2a407aa.js"></script>
+        <script src="searcher-09f2665d.js"></script>
 
         <script src="clipboard-1626706a.min.js"></script>
         <script src="highlight-abc7f01d.js"></script>
-        <script src="book-a0b12cfe.js"></script>
+        <script src="book-609e4cb8.js"></script>
 
         <!-- Custom JS scripts -->
 
