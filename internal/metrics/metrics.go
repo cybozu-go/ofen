@@ -6,6 +6,13 @@ import (
 
 const (
 	metricsNamespace = "ofen"
+
+	labelNamespace      = "namespace"
+	labelImagePrefetch  = "imageprefetch"
+	labelNodeImageSet   = "nodeimageset"
+	labelImage          = "image"
+	labelRegistryPolicy = "registry_policy"
+	labelNode           = "node"
 )
 
 var (
@@ -13,37 +20,37 @@ var (
 		Namespace: metricsNamespace,
 		Name:      "imageprefetch_ready",
 		Help:      "1 if the ImagePrefetch resource is ready, 0 otherwise",
-	}, []string{"namespace", "imageprefetch"})
+	}, []string{labelNamespace, labelImagePrefetch})
 
 	ImagePulledNodesVec = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: metricsNamespace,
 		Name:      "imageprefetch_image_pull_successful_nodes",
 		Help:      "Number of nodes where images have been successfully prefetched for thins Imageprefetch",
-	}, []string{"namespace", "imageprefetch"})
+	}, []string{labelNamespace, labelImagePrefetch})
 
 	ImagePullFailedNodesVec = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: metricsNamespace,
 		Name:      "imageprefetch_image_pull_failed_nodes",
 		Help:      "Number of nodes where image prefetching has failed for this ImagePrefetch",
-	}, []string{"namespace", "imageprefetch"})
+	}, []string{labelNamespace, labelImagePrefetch})
 
 	ImageInfoVec = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: metricsNamespace,
 		Name:      "nodeimageset_image_info",
 		Help:      "Information about NodeImageSet image",
-	}, []string{"nodeimageset", "image", "registry_policy", "node"})
+	}, []string{labelNodeImageSet, labelImage, labelRegistryPolicy, labelNode})
 
 	ImageSizeBytesVec = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: metricsNamespace,
 		Name:      "nodeimageset_image_size_bytes",
 		Help:      "Size of images in NodeImageSets in bytes",
-	}, []string{"nodeimageset", "image", "node"})
+	}, []string{labelNodeImageSet, labelImage, labelNode})
 
 	ImagePrefetchDurationSecondsVec = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: metricsNamespace,
 		Name:      "nodeimageset_image_prefetch_duration_seconds",
 		Help:      "Duration taken to prefetch images in NodeImageSets in seconds",
-	}, []string{"nodeimageset", "image", "node"})
+	}, []string{labelNodeImageSet, labelImage, labelNode})
 )
 
 func Register(registry prometheus.Registerer) {

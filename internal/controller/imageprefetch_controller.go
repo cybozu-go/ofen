@@ -73,7 +73,8 @@ func (r *ImagePrefetchReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 			logger.Error(err, "failed to add finalizer")
 			return ctrl.Result{}, err
 		}
-		return ctrl.Result{Requeue: true}, nil
+		// Adding the finalizer triggers another reconciliation.
+		return ctrl.Result{}, nil
 	}
 
 	selectNodes, err := r.selectTargetNodes(ctx, &imgPrefetch)

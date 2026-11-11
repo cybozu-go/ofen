@@ -37,6 +37,9 @@ linters:
           - lll
         path: internal/*
       - linters:
+          - goconst
+        path: _test\.go
+      - linters:
           - errcheck
         source: "^\\s*defer\\s+"
     paths:
