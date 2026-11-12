@@ -123,9 +123,25 @@ func registryMirrorHosts(ctx context.Context, hostOpt config.HostOptions) docker
 			return nil, err
 		}
 
+		// ConfigureHosts always places the upstream registry as the last element:
+		// the `server` in hosts.toml, or the default host when it is not specified
+		// (e.g. registry-1.docker.io for docker.io).
+		// Since its host name may differ from the registry name, take the last element
+		// as the upstream instead of comparing with the registry name.
+		// The upstream may also be listed explicitly as a [host] entry, so exclude
+		// hosts that have the same host name as the upstream as well.
+		// https://github.com/containerd/containerd/blob/v2.2.2/core/remotes/docker/config/hosts.go#L94-L135
+		// https://github.com/containerd/containerd/blob/v2.2.2/core/remotes/docker/config/hosts.go#L413-L418
+		if len(rhosts) == 0 {
+			return []docker.RegistryHost{}, nil
+		}
+		upstream := rhosts[len(rhosts)-1]
+		rhosts = rhosts[:len(rhosts)-1]
+
 		mirrorHosts := []docker.RegistryHost{}
 		for _, rhost := range rhosts {
-			if rhost.Host == host {
+			if rhost.Host == upstream.Host {
+				logger.Info("skipping host same as upstream registry", "host", rhost.Host)
 				continue
 			}
 			if !rhost.Capabilities.Has(docker.HostCapabilityPull) {
