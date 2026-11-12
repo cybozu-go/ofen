@@ -153,6 +153,7 @@ func main() {
 		ctrl.Log.WithName("runner").WithValues("nodeName", nodeName),
 		queue,
 		mgr.GetEventRecorder("image-pull-runner"),
+		ch,
 	)
 	err = mgr.Add(runner)
 	if err != nil {

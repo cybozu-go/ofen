@@ -11,6 +11,7 @@ import (
 	"k8s.io/client-go/tools/events"
 	"k8s.io/client-go/util/workqueue"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 
 	ofenv1 "github.com/cybozu-go/ofen/api/v1"
 	"github.com/cybozu-go/ofen/internal/constants"
@@ -23,15 +24,24 @@ type Runner struct {
 	logger      logr.Logger
 	queue       workqueue.TypedRateLimitingInterface[imgmanager.Task]
 	recorder    events.EventRecorder
+	notifyCh    chan<- event.TypedGenericEvent[*ofenv1.NodeImageSet]
 }
 
-func NewRunner(k8sClient client.Client, imagePuller *imgmanager.ImagePuller, logger logr.Logger, queue workqueue.TypedRateLimitingInterface[imgmanager.Task], recorder events.EventRecorder) *Runner {
+func NewRunner(
+	k8sClient client.Client,
+	imagePuller *imgmanager.ImagePuller,
+	logger logr.Logger,
+	queue workqueue.TypedRateLimitingInterface[imgmanager.Task],
+	recorder events.EventRecorder,
+	notifyCh chan<- event.TypedGenericEvent[*ofenv1.NodeImageSet],
+) *Runner {
 	return &Runner{
 		k8sClient:   k8sClient,
 		imagePuller: imagePuller,
 		logger:      logger,
 		queue:       queue,
 		recorder:    recorder,
+		notifyCh:    notifyCh,
 	}
 }
 
@@ -63,10 +73,22 @@ func (r *Runner) runWorker(ctx context.Context) {
 			if err != nil {
 				r.logger.Error(err, "failed to process task", "task", item)
 				r.queue.AddRateLimited(item)
-			} else {
-				r.queue.Forget(item)
+				return
 			}
+			r.queue.Forget(item)
+			// Notify only on success. A failed task is still waiting for download if it failed before
+			// pulling the image, so the reconciler would add it again and skip the backoff.
+			r.notify(ctx, item.NodeImageSetName)
 		}()
+	}
+}
+
+func (r *Runner) notify(ctx context.Context, nodeImageSetName string) {
+	nodeImageSet := &ofenv1.NodeImageSet{}
+	nodeImageSet.Name = nodeImageSetName
+	select {
+	case r.notifyCh <- event.TypedGenericEvent[*ofenv1.NodeImageSet]{Object: nodeImageSet}:
+	case <-ctx.Done():
 	}
 }
 
