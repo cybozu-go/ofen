@@ -158,6 +158,13 @@ func (c *Containerd) Subscribe(ctx context.Context) (<-chan *events.Envelope, <-
 	filters := generateEventFilter()
 	srcEventsCh, srcErrCh := c.client.EventService().Subscribe(ctx, filters...)
 
+	return relaySubscription(ctx, srcEventsCh, srcErrCh)
+}
+
+// relaySubscription forwards a containerd subscription to channels that are
+// both closed once the subscription ends, i.e. when ctx is done or the source
+// reports an error or closes either of its channels.
+func relaySubscription(ctx context.Context, srcEventsCh <-chan *events.Envelope, srcErrCh <-chan error) (<-chan *events.Envelope, <-chan error) {
 	eventsCh := make(chan *events.Envelope)
 	errCh := make(chan error, 1)
 

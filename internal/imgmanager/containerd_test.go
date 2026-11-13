@@ -2,10 +2,13 @@ package imgmanager
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
+	"github.com/containerd/containerd/v2/core/events"
 	"github.com/containerd/containerd/v2/core/remotes/docker/config"
 	"github.com/stretchr/testify/require"
 )
@@ -219,4 +222,138 @@ func TestSetupResolver(t *testing.T) {
 
 	resolverMirrorOnly := c.setupResolver(ctx, true, tokens)
 	require.NotNil(t, resolverMirrorOnly)
+}
+
+// requireSubscriptionClosed asserts that both relayed channels get closed and
+// returns the error reported on the error channel, if any.
+func requireSubscriptionClosed(t *testing.T, eventsCh <-chan *events.Envelope, errCh <-chan error) error {
+	t.Helper()
+
+	timeout := time.After(5 * time.Second)
+
+	select {
+	case event, ok := <-eventsCh:
+		require.False(t, ok, "unexpected event: %v", event)
+	case <-timeout:
+		require.FailNow(t, "event channel was not closed")
+	}
+
+	var reported error
+	for {
+		select {
+		case err, ok := <-errCh:
+			if !ok {
+				return reported
+			}
+			require.NoError(t, reported, "more than one error was reported")
+			reported = err
+		case <-timeout:
+			require.FailNow(t, "error channel was not closed")
+		}
+	}
+}
+
+func TestRelaySubscriptionForwardsEvents(t *testing.T) {
+	t.Parallel()
+
+	srcEventsCh := make(chan *events.Envelope)
+	srcErrCh := make(chan error)
+	eventsCh, _ := relaySubscription(t.Context(), srcEventsCh, srcErrCh)
+
+	for _, topic := range []string{"/images/delete", "/images/delete/again"} {
+		sent := &events.Envelope{Topic: topic}
+		select {
+		case srcEventsCh <- sent:
+		case <-time.After(5 * time.Second):
+			require.FailNow(t, "event was not consumed")
+		}
+
+		select {
+		case received, ok := <-eventsCh:
+			require.True(t, ok)
+			require.Same(t, sent, received)
+		case <-time.After(5 * time.Second):
+			require.FailNow(t, "event was not forwarded")
+		}
+	}
+}
+
+// The containerd client leaves its event channel open when the subscription
+// ends, so srcEventsCh is never closed in the following tests.
+
+func TestRelaySubscriptionForwardsErrorAndCloses(t *testing.T) {
+	t.Parallel()
+
+	srcEventsCh := make(chan *events.Envelope)
+	srcErrCh := make(chan error, 1)
+	eventsCh, errCh := relaySubscription(t.Context(), srcEventsCh, srcErrCh)
+
+	srcErr := errors.New("failed to dial containerd socket")
+	srcErrCh <- srcErr
+	close(srcErrCh)
+
+	require.ErrorIs(t, requireSubscriptionClosed(t, eventsCh, errCh), srcErr)
+}
+
+func TestRelaySubscriptionClosesWhenErrorChannelCloses(t *testing.T) {
+	t.Parallel()
+
+	srcEventsCh := make(chan *events.Envelope)
+	srcErrCh := make(chan error)
+	eventsCh, errCh := relaySubscription(t.Context(), srcEventsCh, srcErrCh)
+
+	close(srcErrCh)
+
+	require.NoError(t, requireSubscriptionClosed(t, eventsCh, errCh))
+}
+
+func TestRelaySubscriptionClosesOnContextCancellation(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := context.WithCancel(t.Context())
+	srcEventsCh := make(chan *events.Envelope)
+	srcErrCh := make(chan error)
+	eventsCh, errCh := relaySubscription(ctx, srcEventsCh, srcErrCh)
+
+	cancel()
+
+	require.NoError(t, requireSubscriptionClosed(t, eventsCh, errCh))
+}
+
+func TestRelaySubscriptionClosesOnContextCancellationWithPendingEvent(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := context.WithCancel(t.Context())
+	srcEventsCh := make(chan *events.Envelope)
+	srcErrCh := make(chan error)
+	eventsCh, errCh := relaySubscription(ctx, srcEventsCh, srcErrCh)
+
+	// Nobody reads eventsCh, so the relay is blocked forwarding this event.
+	select {
+	case srcEventsCh <- &events.Envelope{Topic: "/images/delete"}:
+	case <-time.After(5 * time.Second):
+		require.FailNow(t, "event was not consumed")
+	}
+
+	cancel()
+
+	// The pending event may or may not be delivered before the channel closes.
+	select {
+	case _, ok := <-eventsCh:
+		if !ok {
+			eventsCh = nil
+		}
+	case <-time.After(5 * time.Second):
+		require.FailNow(t, "event channel was not closed")
+	}
+	if eventsCh != nil {
+		require.NoError(t, requireSubscriptionClosed(t, eventsCh, errCh))
+		return
+	}
+	select {
+	case err, ok := <-errCh:
+		require.False(t, ok, "unexpected error: %v", err)
+	case <-time.After(5 * time.Second):
+		require.FailNow(t, "error channel was not closed")
+	}
 }
