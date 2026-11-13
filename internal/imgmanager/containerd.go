@@ -20,6 +20,9 @@ import (
 type ContainerdClient interface {
 	IsImageExists(ctx context.Context, ref string) (bool, error)
 	PullImage(ctx context.Context, ref string, policy ofenv1.RegistryPolicy, secrets *[]corev1.Secret) (int64, error)
+	// Subscribe returns the event stream and an error channel. Implementations
+	// must close both channels once the subscription ends, reporting at most one
+	// error on the error channel beforehand.
 	Subscribe(ctx context.Context) (<-chan *events.Envelope, <-chan error)
 }
 
@@ -164,9 +167,50 @@ func credentials(tokens map[string]Credentials) func(host string) (string, strin
 	}
 }
 
+// Subscribe implements ContainerdClient. The containerd client never closes the
+// event channel it returns, so the channels are relayed here to guarantee that
+// both of them are closed once the subscription ends.
 func (c *Containerd) Subscribe(ctx context.Context) (<-chan *events.Envelope, <-chan error) {
 	filters := generateEventFilter()
-	eventsCh, errCh := c.client.EventService().Subscribe(ctx, filters...)
+	srcEventsCh, srcErrCh := c.client.EventService().Subscribe(ctx, filters...)
+
+	return relaySubscription(ctx, srcEventsCh, srcErrCh)
+}
+
+// relaySubscription forwards a containerd subscription to channels that are
+// both closed once the subscription ends, i.e. when ctx is done or the source
+// reports an error or closes either of its channels.
+func relaySubscription(ctx context.Context, srcEventsCh <-chan *events.Envelope, srcErrCh <-chan error) (<-chan *events.Envelope, <-chan error) {
+	eventsCh := make(chan *events.Envelope)
+	errCh := make(chan error, 1)
+
+	go func() {
+		defer close(eventsCh)
+		defer close(errCh)
+
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case event, ok := <-srcEventsCh:
+				if !ok {
+					return
+				}
+				select {
+				case eventsCh <- event:
+				case <-ctx.Done():
+					return
+				}
+			case err, ok := <-srcErrCh:
+				// containerd reports at most one error, then ends the subscription.
+				if ok && err != nil {
+					errCh <- err
+				}
+				return
+			}
+		}
+	}()
+
 	return eventsCh, errCh
 }
 

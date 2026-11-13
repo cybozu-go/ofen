@@ -23,6 +23,8 @@ type FakeContainerd struct {
 	pullDelay          time.Duration // Simulate delay for pulling images
 	testEventsCh       chan *events.Envelope
 	testErrCh          chan error
+	subscribeCount     int
+	failSubscribes     int
 }
 
 func NewFakeContainerd(k8sClient ctrl.Client) *FakeContainerd {
@@ -48,8 +50,23 @@ func (f *FakeContainerd) IsImageExists(ctx context.Context, ref string) (bool, e
 }
 
 func (f *FakeContainerd) Subscribe(ctx context.Context) (<-chan *events.Envelope, <-chan error) {
+	f.mu.Lock()
+	f.subscribeCount++
+	failSubscribe := f.failSubscribes > 0
+	if failSubscribe {
+		f.failSubscribes--
+	}
+	f.mu.Unlock()
+
 	eventsCh := make(chan *events.Envelope)
-	errCh := make(chan error)
+	errCh := make(chan error, 1)
+
+	if failSubscribe {
+		errCh <- fmt.Errorf("failed to dial containerd socket")
+		close(errCh)
+		close(eventsCh)
+		return eventsCh, errCh
+	}
 
 	go func() {
 		defer close(eventsCh)
@@ -65,11 +82,11 @@ func (f *FakeContainerd) Subscribe(ctx context.Context) (<-chan *events.Envelope
 					return
 				}
 			case err := <-f.testErrCh:
-				select {
-				case errCh <- err:
-				case <-ctx.Done():
-					return
+				// containerd reports at most one error, then ends the subscription.
+				if err != nil {
+					errCh <- err
 				}
+				return
 			}
 		}
 	}()
@@ -93,6 +110,27 @@ func (f *FakeContainerd) SendTestEvent(event *events.Envelope) error {
 		f.testEventsCh <- event
 	}
 	return nil
+}
+
+// FailNextSubscribes makes the next n Subscribe calls fail, as containerd does
+// while its socket is unavailable.
+func (f *FakeContainerd) FailNextSubscribes(n int) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.failSubscribes = n
+}
+
+func (f *FakeContainerd) SubscribeCount() int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.subscribeCount
+}
+
+// SendSubscriptionError simulates containerd terminating an event subscription.
+// A nil error ends the subscription without reporting anything, as containerd
+// does when the event stream is closed cleanly.
+func (f *FakeContainerd) SendSubscriptionError(err error) {
+	f.testErrCh <- err
 }
 
 // RegisterImagePullError allows registering a specific error to be returned
