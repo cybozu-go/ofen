@@ -478,6 +478,39 @@ func TestImagePullerSubscribeDeleteEventSubscriptionError(t *testing.T) {
 	}
 }
 
+type closedSubscriptionContainerd struct {
+	*FakeContainerd
+}
+
+func (c *closedSubscriptionContainerd) Subscribe(ctx context.Context) (<-chan *events.Envelope, <-chan error) {
+	eventsCh := make(chan *events.Envelope)
+	errCh := make(chan error)
+	close(errCh)
+	return eventsCh, errCh
+}
+
+func TestImagePullerSubscribeDeleteEventSubscriptionClosed(t *testing.T) {
+	t.Parallel()
+
+	logger := logr.Discard()
+	fakeClient := &closedSubscriptionContainerd{FakeContainerd: NewFakeContainerd(nil)}
+	puller := NewImagePuller(logger, fakeClient)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	deleteCh, err := puller.SubscribeDeleteEvent(ctx)
+	require.NoError(t, err)
+
+	// Channel should be closed without the context cancellation
+	select {
+	case _, ok := <-deleteCh:
+		assert.False(t, ok, "Channel should be closed")
+	case <-time.After(time.Second):
+		t.Fatal("Channel was not closed in time")
+	}
+}
+
 func TestHandleDeleteEventValidEvent(t *testing.T) {
 	t.Parallel()
 
