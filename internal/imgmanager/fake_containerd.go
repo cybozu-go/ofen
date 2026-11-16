@@ -68,8 +68,8 @@ func (f *FakeContainerd) Subscribe(ctx context.Context) (<-chan *events.Envelope
 				select {
 				case errCh <- err:
 				case <-ctx.Done():
-					return
 				}
+				return
 			}
 		}
 	}()
@@ -93,6 +93,10 @@ func (f *FakeContainerd) SendTestEvent(event *events.Envelope) error {
 		f.testEventsCh <- event
 	}
 	return nil
+}
+
+func (f *FakeContainerd) SendSubscriptionError(err error) {
+	f.testErrCh <- err
 }
 
 // RegisterImagePullError allows registering a specific error to be returned

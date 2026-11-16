@@ -453,6 +453,31 @@ func TestImagePullerSubscribeDeleteEventContextCancellation(t *testing.T) {
 	}
 }
 
+func TestImagePullerSubscribeDeleteEventSubscriptionError(t *testing.T) {
+	t.Parallel()
+
+	logger := logr.Discard()
+	fakeClient := NewFakeContainerd(nil)
+	puller := NewImagePuller(logger, fakeClient)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	deleteCh, err := puller.SubscribeDeleteEvent(ctx)
+	require.NoError(t, err)
+
+	// containerd closes its socket, which terminates the subscription.
+	fakeClient.SendSubscriptionError(fmt.Errorf("rpc error: code = Unavailable desc = error reading from server: EOF"))
+
+	// Channel should be closed
+	select {
+	case _, ok := <-deleteCh:
+		assert.False(t, ok, "Channel should be closed")
+	case <-time.After(time.Second):
+		t.Fatal("Channel was not closed in time")
+	}
+}
+
 func TestHandleDeleteEventValidEvent(t *testing.T) {
 	t.Parallel()
 
