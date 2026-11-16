@@ -16,7 +16,7 @@ import (
 //
 // NodeImageSet is the Schema for the nodeimagesets API
 type NodeImageSetApplyConfiguration struct {
-	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	metav1.TypeMetaApplyConfiguration    `json:""`
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	Spec                                 *NodeImageSetSpecApplyConfiguration   `json:"spec,omitempty"`
 	Status                               *NodeImageSetStatusApplyConfiguration `json:"status,omitempty"`
