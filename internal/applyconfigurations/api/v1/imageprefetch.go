@@ -16,7 +16,7 @@ import (
 //
 // ImagePrefetch is the Schema for the imageprefetches API
 type ImagePrefetchApplyConfiguration struct {
-	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	metav1.TypeMetaApplyConfiguration    `json:""`
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	Spec                                 *ImagePrefetchSpecApplyConfiguration   `json:"spec,omitempty"`
 	Status                               *ImagePrefetchStatusApplyConfiguration `json:"status,omitempty"`

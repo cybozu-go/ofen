@@ -1,8 +1,8 @@
 {
   "checksums": [
     {
-      "id": "github_archive/github.com/kubernetes/kubernetes/v1.36.5",
-      "checksum": "E768E95C34605F3829116736E189F46AF54C6416C3229CADD7308E524202735B",
+      "id": "github_archive/github.com/kubernetes/kubernetes/v1.37.1",
+      "checksum": "89295AC375EB0FDFE68A0696D81BE615771D6B27C7AD9BB675DC6FFD0D2CE5F3",
       "algorithm": "sha256"
     },
     {
@@ -46,23 +46,23 @@
       "algorithm": "sha256"
     },
     {
-      "id": "github_release/github.com/kubernetes-sigs/controller-runtime/v0.24.1/setup-envtest-darwin-amd64",
-      "checksum": "3FB17F2B1B0F09B7E5395180BD2BCB1D53BB78D72BB0415106B7AE8BF64E23D0",
+      "id": "github_release/github.com/kubernetes-sigs/controller-runtime/v0.25.2/setup-envtest-darwin-amd64",
+      "checksum": "EA7B593B26AF05ADCD07BC829741ECC3D1542AE5D3F0140B3B4D0BDDB74BCA8A",
       "algorithm": "sha256"
     },
     {
-      "id": "github_release/github.com/kubernetes-sigs/controller-runtime/v0.24.1/setup-envtest-darwin-arm64",
-      "checksum": "7E59A0D526F6946AA2F114D34B2E309639C811F3A4F83D56F37B6E3197C6FDFB",
+      "id": "github_release/github.com/kubernetes-sigs/controller-runtime/v0.25.2/setup-envtest-darwin-arm64",
+      "checksum": "7C95D67911E157D2CAA02F599BCF9321B4E759D2F008749B4D03ED9D3E6A8C69",
       "algorithm": "sha256"
     },
     {
-      "id": "github_release/github.com/kubernetes-sigs/controller-runtime/v0.24.1/setup-envtest-linux-amd64",
-      "checksum": "A9A78FADFC338A38188332F36863C76877F1C86DF1A83D2241D2BFC3935297D2",
+      "id": "github_release/github.com/kubernetes-sigs/controller-runtime/v0.25.2/setup-envtest-linux-amd64",
+      "checksum": "94534F83896F3B09934D9570B213FBDA04AA5C17457942270928CDCA0317BF9B",
       "algorithm": "sha256"
     },
     {
-      "id": "github_release/github.com/kubernetes-sigs/controller-runtime/v0.24.1/setup-envtest-linux-arm64",
-      "checksum": "C5D8968EC3F2A120B66BC13BD36F80FE4150C34AAE7CC491BF9624C8680296C7",
+      "id": "github_release/github.com/kubernetes-sigs/controller-runtime/v0.25.2/setup-envtest-linux-arm64",
+      "checksum": "694C6F9D830B8EFA1A211CDC98859121EDBB5EA523300D18C21CE89CE7FEEB8E",
       "algorithm": "sha256"
     },
     {
@@ -156,23 +156,23 @@
       "algorithm": "sha256"
     },
     {
-      "id": "http/dl.k8s.io/v1.36.3/bin/darwin/amd64/kubectl",
-      "checksum": "158B3B46CF74E8B6BD9B1D7CD30F665E3EFB2BC1EC3C843EC925BCFDD2930DE0",
+      "id": "http/dl.k8s.io/v1.37.0/bin/darwin/amd64/kubectl",
+      "checksum": "D5276C0F4FDE77FC446070290F345944A7F1FDA153DF6B960E5FDE93B7A9BCCD",
       "algorithm": "sha256"
     },
     {
-      "id": "http/dl.k8s.io/v1.36.3/bin/darwin/arm64/kubectl",
-      "checksum": "FC8582ACDE13869A606730A79379D6515F30C68AFCCED0B5AC8789D5D002B7D6",
+      "id": "http/dl.k8s.io/v1.37.0/bin/darwin/arm64/kubectl",
+      "checksum": "583BEEDAEBE422E71D3F1A96ACEF8B1FEF86EA2F09A45AD01AA6C9CE287C1380",
       "algorithm": "sha256"
     },
     {
-      "id": "http/dl.k8s.io/v1.36.3/bin/linux/amd64/kubectl",
-      "checksum": "EBBD080E7C2E275093B55915722043257EB24004363E20ACB3C4D71919F88336",
+      "id": "http/dl.k8s.io/v1.37.0/bin/linux/amd64/kubectl",
+      "checksum": "6129359F4E1F3848A5572CCB0B26CF28B8CA08CEF38C95A765B2F64A2C961A2F",
       "algorithm": "sha256"
     },
     {
-      "id": "http/dl.k8s.io/v1.36.3/bin/linux/arm64/kubectl",
-      "checksum": "3D86F24401C41AE5A46AC50EEF8865FE891D3647D324A0836F6C63757A126E62",
+      "id": "http/dl.k8s.io/v1.37.0/bin/linux/arm64/kubectl",
+      "checksum": "922DF28DF248CC00A9E025F947704F1D1482DE64ECE54CFE57E61F19EAF1EEF3",
       "algorithm": "sha256"
     },
     {
