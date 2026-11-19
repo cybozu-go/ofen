@@ -32,6 +32,7 @@ var _ = Describe("ContainerdEventWatcher", func() {
 		eventChannel         chan event.TypedGenericEvent[*ofenv1.NodeImageSet]
 		nodeName             string
 		wg                   sync.WaitGroup
+		startErrCh           chan error
 		stopFunc             func()
 	)
 	ctx := context.Background()
@@ -80,14 +81,17 @@ var _ = Describe("ContainerdEventWatcher", func() {
 		err = k8sClient.Create(ctx, nis)
 		Expect(err).NotTo(HaveOccurred())
 
+		startErrCh = make(chan error, 1)
 		eventWatcher := NewContainerdEventWatcher(k8sClient, fakeContainerdClient, imagePuller, log, nodeName, eventChannel)
 		wg.Add(1)
 		go func() {
 			defer GinkgoRecover()
 			defer wg.Done()
-			if err := eventWatcher.Start(ctx); err != nil {
+			err := eventWatcher.Start(ctx)
+			if err != nil {
 				log.Error(err, "eventWatcher.Start failed")
 			}
+			startErrCh <- err
 		}()
 		time.Sleep(200 * time.Millisecond)
 	})
@@ -152,5 +156,27 @@ var _ = Describe("ContainerdEventWatcher", func() {
 			Consistently(eventChannel, "2s", "100ms").ShouldNot(Receive(), "Should not receive an event for non-image-delete topics")
 		})
 
+	})
+
+	Context("when the containerd event subscription ends", func() {
+		It("should stop with an error", func() {
+			By("terminating the subscription")
+			fakeContainerdClient.SendSubscriptionError(fmt.Errorf("rpc error: code = Unavailable desc = error reading from server: EOF"))
+
+			By("checking that Start returns an error")
+			var startErr error
+			Eventually(startErrCh, "5s", "100ms").Should(Receive(&startErr))
+			Expect(startErr).To(HaveOccurred())
+		})
+	})
+
+	Context("when the context is cancelled", func() {
+		It("should stop without an error", func() {
+			stopFunc()
+
+			var startErr error
+			Eventually(startErrCh, "5s", "100ms").Should(Receive(&startErr))
+			Expect(startErr).NotTo(HaveOccurred())
+		})
 	})
 })
