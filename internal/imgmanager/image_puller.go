@@ -318,9 +318,10 @@ func (p *ImagePuller) SubscribeDeleteEvent(ctx context.Context) (<-chan string, 
 			case <-ctx.Done():
 				return
 			case err, ok := <-errorCh:
-				// containerd closes errorCh when containerd restarts, so this case
-				// catches the restart. This goroutine returns here so that ofen
-				// exits, and the restarted ofen reconnects to containerd.
+				// When the subscription stream ends (e.g. containerd restarts), the
+				// containerd client sends an error and then closes errorCh.
+				// Then this goroutine returns and closes imageDeletionCh to notify
+				// the caller that the subscription has ended.
 				if ok && err != nil {
 					p.logger.Error(err, "containerd event subscription failed")
 				}
