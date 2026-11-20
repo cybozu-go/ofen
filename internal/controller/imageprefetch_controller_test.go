@@ -3,6 +3,7 @@ package controller
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -12,6 +13,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -107,10 +109,33 @@ func deleteAllNodes(ctx context.Context) {
 	}
 }
 
+// applyCountingClient counts the number of applies for each object.
+type applyCountingClient struct {
+	client.Client
+	mu     sync.Mutex
+	counts map[string]int
+}
+
+func (c *applyCountingClient) Apply(ctx context.Context, obj runtime.ApplyConfiguration, opts ...client.ApplyOption) error {
+	if nodeImageSet, ok := obj.(*ofenv1apply.NodeImageSetApplyConfiguration); ok {
+		c.mu.Lock()
+		c.counts[*nodeImageSet.Name]++
+		c.mu.Unlock()
+	}
+	return c.Client.Apply(ctx, obj, opts...)
+}
+
+func (c *applyCountingClient) count(name string) int {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.counts[name]
+}
+
 var _ = Describe("ImagePrefetch Controller", Serial, func() {
 	Context("When reconciling a resource", func() {
 		ctx := context.Background()
 		var stopFunc func()
+		var applyCounter *applyCountingClient
 
 		BeforeEach(func() {
 			mgr, err := ctrl.NewManager(cfg, ctrl.Options{
@@ -125,8 +150,9 @@ var _ = Describe("ImagePrefetch Controller", Serial, func() {
 			})
 			Expect(err).NotTo(HaveOccurred())
 
+			applyCounter = &applyCountingClient{Client: mgr.GetClient(), counts: map[string]int{}}
 			reconciler := &ImagePrefetchReconciler{
-				Client:                             mgr.GetClient(),
+				Client:                             applyCounter,
 				Scheme:                             mgr.GetScheme(),
 				ImagePullNodeLimit:                 imagePullNodeLimit,
 				MaxConcurrentNodeImageSetCreations: maxConcurrentNodeImageSetCreations,
@@ -504,6 +530,21 @@ var _ = Describe("ImagePrefetch Controller", Serial, func() {
 				g.Expect(conditionNoImagePrefetchFailed.Status).To(Equal(metav1.ConditionFalse))
 			}).Should(Succeed())
 
+			By("recording the number of applies for NodeImageSets")
+			nodeImageSets := &ofenv1.NodeImageSetList{}
+			err := k8sClient.List(ctx, nodeImageSets, &client.ListOptions{
+				LabelSelector: labels.SelectorFromSet(map[string]string{
+					constants.OwnerImagePrefetchNamespace: testName,
+				}),
+			})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(nodeImageSets.Items).To(HaveLen(replicas))
+			applyCounts := map[string]int{}
+			for _, nodeImageSet := range nodeImageSets.Items {
+				applyCounts[nodeImageSet.Name] = applyCounter.count(nodeImageSet.Name)
+				Expect(applyCounts[nodeImageSet.Name]).To(BeNumerically(">", 0))
+			}
+
 			By("updating nodeImageSet's status to image available")
 			failedCondition.Status = metav1.ConditionTrue
 			imageAvailableCondition := metav1.Condition{
@@ -547,6 +588,11 @@ var _ = Describe("ImagePrefetch Controller", Serial, func() {
 				g.Expect(conditionNoImagePrefetchFailed).NotTo(BeNil())
 				g.Expect(conditionNoImagePrefetchFailed.Status).To(Equal(metav1.ConditionTrue))
 			}).Should(Succeed())
+
+			By("checking that up-to-date NodeImageSets are not applied again")
+			for name, count := range applyCounts {
+				Expect(applyCounter.count(name)).To(Equal(count))
+			}
 
 			By("cleaning up the ImagePrefetch resource")
 			deleteImagePrefetchResource(ctx, imagePrefetch)
@@ -1213,91 +1259,5 @@ var _ = Describe("newCondition", func() {
 	It("should set the last transition time if the condition does not exist", func() {
 		condition := newCondition(current, ofenv1.ConditionNoImagePullFailed, metav1.ConditionTrue, "NoImagePullFailed", "No nodes have failed to pull the image")
 		Expect(condition.LastTransitionTime.After(lastTransitionTime.Time)).To(BeTrue())
-	})
-})
-
-var _ = Describe("isNodeImageSetUpToDate", Serial, func() {
-	const (
-		nodeImageSetName = "test-up-to-date"
-		nodeName         = "worker-0"
-	)
-
-	imgPrefetch := &ofenv1.ImagePrefetch{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:       "test",
-			Namespace:  "default",
-			Generation: 2,
-		},
-	}
-
-	newNodeImageSet := func(secrets ...corev1.LocalObjectReference) *ofenv1apply.NodeImageSetApplyConfiguration {
-		return ofenv1apply.NodeImageSet(nodeImageSetName).
-			WithLabels(labelSet(imgPrefetch, nodeName)).
-			WithSpec(ofenv1apply.NodeImageSetSpec().
-				WithImages(testImagesList...).
-				WithRegistryPolicy(ofenv1.RegistryPolicyMirrorOnly).
-				WithNodeName(nodeName).
-				WithImagePullSecrets(secrets...).
-				WithImagePrefetchGeneration(imgPrefetch.Generation),
-			)
-	}
-
-	AfterEach(func(ctx SpecContext) {
-		err := k8sClient.Delete(ctx, &ofenv1.NodeImageSet{ObjectMeta: metav1.ObjectMeta{Name: nodeImageSetName}})
-		Expect(client.IgnoreNotFound(err)).NotTo(HaveOccurred())
-	})
-
-	It("should return true if the applied configuration is the same", func(ctx SpecContext) {
-		err := k8sClient.Apply(ctx, newNodeImageSet(corev1.LocalObjectReference{Name: testImagePullSecret}), client.FieldOwner(constants.ImagePrefetchFieldManager), client.ForceOwnership)
-		Expect(err).NotTo(HaveOccurred())
-
-		current := &ofenv1.NodeImageSet{}
-		err = k8sClient.Get(ctx, client.ObjectKey{Name: nodeImageSetName}, current)
-		Expect(err).NotTo(HaveOccurred())
-
-		upToDate, err := isNodeImageSetUpToDate(current, newNodeImageSet(corev1.LocalObjectReference{Name: testImagePullSecret}))
-		Expect(err).NotTo(HaveOccurred())
-		Expect(upToDate).To(BeTrue())
-	})
-
-	It("should return true if both the applied and desired configurations have no image pull secrets", func(ctx SpecContext) {
-		err := k8sClient.Apply(ctx, newNodeImageSet(), client.FieldOwner(constants.ImagePrefetchFieldManager), client.ForceOwnership)
-		Expect(err).NotTo(HaveOccurred())
-
-		current := &ofenv1.NodeImageSet{}
-		err = k8sClient.Get(ctx, client.ObjectKey{Name: nodeImageSetName}, current)
-		Expect(err).NotTo(HaveOccurred())
-
-		upToDate, err := isNodeImageSetUpToDate(current, newNodeImageSet())
-		Expect(err).NotTo(HaveOccurred())
-		Expect(upToDate).To(BeTrue())
-	})
-
-	It("should return false if images are changed", func(ctx SpecContext) {
-		err := k8sClient.Apply(ctx, newNodeImageSet(), client.FieldOwner(constants.ImagePrefetchFieldManager), client.ForceOwnership)
-		Expect(err).NotTo(HaveOccurred())
-
-		current := &ofenv1.NodeImageSet{}
-		err = k8sClient.Get(ctx, client.ObjectKey{Name: nodeImageSetName}, current)
-		Expect(err).NotTo(HaveOccurred())
-
-		desired := newNodeImageSet()
-		desired.Spec.Images = []string{"foobar:123"}
-		upToDate, err := isNodeImageSetUpToDate(current, desired)
-		Expect(err).NotTo(HaveOccurred())
-		Expect(upToDate).To(BeFalse())
-	})
-
-	It("should return false if the NodeImageSet is applied by another field manager", func(ctx SpecContext) {
-		err := k8sClient.Apply(ctx, newNodeImageSet(), client.FieldOwner("other-manager"), client.ForceOwnership)
-		Expect(err).NotTo(HaveOccurred())
-
-		current := &ofenv1.NodeImageSet{}
-		err = k8sClient.Get(ctx, client.ObjectKey{Name: nodeImageSetName}, current)
-		Expect(err).NotTo(HaveOccurred())
-
-		upToDate, err := isNodeImageSetUpToDate(current, newNodeImageSet())
-		Expect(err).NotTo(HaveOccurred())
-		Expect(upToDate).To(BeFalse())
 	})
 })
