@@ -76,7 +76,7 @@ var _ = Describe("NodeImageSet Controller", Serial, func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			// Create and start runner
-			runner := NewRunner(mgr.GetClient(), imagePuller, ctrl.Log.WithName("test-runner"), queue, mgr.GetEventRecorder("test-runner"))
+			runner := NewRunner(mgr.GetClient(), imagePuller, ctrl.Log.WithName("test-runner"), queue, mgr.GetEventRecorder("test-runner"), ch)
 			err = mgr.Add(runner)
 			Expect(err).NotTo(HaveOccurred())
 
@@ -128,6 +128,35 @@ var _ = Describe("NodeImageSet Controller", Serial, func() {
 				g.Expect(nodeImageSet.Status.DesiredImages).To(Equal(1))
 				g.Expect(nodeImageSet.Status.AvailableImages).To(Equal(1))
 			}).Should(Succeed())
+
+			By("cleaning up the NodeImageSet resource")
+			deleteNodeImageSet(ctx, testName)
+		})
+
+		It("should update the status as soon as the image pull finishes", func() {
+			testName := "update-status-on-pull-completion"
+			image := fmt.Sprintf("test/%s/image:latest", testName)
+			fakeContainerdClient.SetPullDelay(3 * time.Second)
+
+			By("creating a NodeImageSet resource")
+			nodeImageSet := createNodeImageSet(testName).
+				WithLabels(map[string]string{
+					constants.NodeName: nodeName,
+				}).
+				withNodeName(nodeName).
+				withImages([]string{image}).
+				withRegistryPolicy(ofenv1.RegistryPolicyDefault).
+				build()
+			err := k8sClient.Create(ctx, nodeImageSet)
+			Expect(err).NotTo(HaveOccurred())
+
+			By("checking that the status is updated without waiting for the periodic requeue")
+			Eventually(func(g Gomega) {
+				currentNis := &ofenv1.NodeImageSet{}
+				err := k8sClient.Get(ctx, client.ObjectKey{Name: testName}, currentNis)
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(currentNis.Status.AvailableImages).To(Equal(1))
+			}).WithTimeout(nodeImageSetResyncInterval / 2).Should(Succeed())
 
 			By("cleaning up the NodeImageSet resource")
 			deleteNodeImageSet(ctx, testName)
