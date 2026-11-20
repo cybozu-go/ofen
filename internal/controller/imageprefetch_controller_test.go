@@ -20,6 +20,7 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
 	ofenv1 "github.com/cybozu-go/ofen/api/v1"
+	ofenv1apply "github.com/cybozu-go/ofen/internal/applyconfigurations/api/v1"
 	"github.com/cybozu-go/ofen/internal/constants"
 )
 
@@ -1212,5 +1213,91 @@ var _ = Describe("newCondition", func() {
 	It("should set the last transition time if the condition does not exist", func() {
 		condition := newCondition(current, ofenv1.ConditionNoImagePullFailed, metav1.ConditionTrue, "NoImagePullFailed", "No nodes have failed to pull the image")
 		Expect(condition.LastTransitionTime.After(lastTransitionTime.Time)).To(BeTrue())
+	})
+})
+
+var _ = Describe("isNodeImageSetUpToDate", Serial, func() {
+	const (
+		nodeImageSetName = "test-up-to-date"
+		nodeName         = "worker-0"
+	)
+
+	imgPrefetch := &ofenv1.ImagePrefetch{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:       "test",
+			Namespace:  "default",
+			Generation: 2,
+		},
+	}
+
+	newNodeImageSet := func(secrets ...corev1.LocalObjectReference) *ofenv1apply.NodeImageSetApplyConfiguration {
+		return ofenv1apply.NodeImageSet(nodeImageSetName).
+			WithLabels(labelSet(imgPrefetch, nodeName)).
+			WithSpec(ofenv1apply.NodeImageSetSpec().
+				WithImages(testImagesList...).
+				WithRegistryPolicy(ofenv1.RegistryPolicyMirrorOnly).
+				WithNodeName(nodeName).
+				WithImagePullSecrets(secrets...).
+				WithImagePrefetchGeneration(imgPrefetch.Generation),
+			)
+	}
+
+	AfterEach(func(ctx SpecContext) {
+		err := k8sClient.Delete(ctx, &ofenv1.NodeImageSet{ObjectMeta: metav1.ObjectMeta{Name: nodeImageSetName}})
+		Expect(client.IgnoreNotFound(err)).NotTo(HaveOccurred())
+	})
+
+	It("should return true if the applied configuration is the same", func(ctx SpecContext) {
+		err := k8sClient.Apply(ctx, newNodeImageSet(corev1.LocalObjectReference{Name: testImagePullSecret}), client.FieldOwner(constants.ImagePrefetchFieldManager), client.ForceOwnership)
+		Expect(err).NotTo(HaveOccurred())
+
+		current := &ofenv1.NodeImageSet{}
+		err = k8sClient.Get(ctx, client.ObjectKey{Name: nodeImageSetName}, current)
+		Expect(err).NotTo(HaveOccurred())
+
+		upToDate, err := isNodeImageSetUpToDate(current, newNodeImageSet(corev1.LocalObjectReference{Name: testImagePullSecret}))
+		Expect(err).NotTo(HaveOccurred())
+		Expect(upToDate).To(BeTrue())
+	})
+
+	It("should return true if both the applied and desired configurations have no image pull secrets", func(ctx SpecContext) {
+		err := k8sClient.Apply(ctx, newNodeImageSet(), client.FieldOwner(constants.ImagePrefetchFieldManager), client.ForceOwnership)
+		Expect(err).NotTo(HaveOccurred())
+
+		current := &ofenv1.NodeImageSet{}
+		err = k8sClient.Get(ctx, client.ObjectKey{Name: nodeImageSetName}, current)
+		Expect(err).NotTo(HaveOccurred())
+
+		upToDate, err := isNodeImageSetUpToDate(current, newNodeImageSet())
+		Expect(err).NotTo(HaveOccurred())
+		Expect(upToDate).To(BeTrue())
+	})
+
+	It("should return false if images are changed", func(ctx SpecContext) {
+		err := k8sClient.Apply(ctx, newNodeImageSet(), client.FieldOwner(constants.ImagePrefetchFieldManager), client.ForceOwnership)
+		Expect(err).NotTo(HaveOccurred())
+
+		current := &ofenv1.NodeImageSet{}
+		err = k8sClient.Get(ctx, client.ObjectKey{Name: nodeImageSetName}, current)
+		Expect(err).NotTo(HaveOccurred())
+
+		desired := newNodeImageSet()
+		desired.Spec.Images = []string{"foobar:123"}
+		upToDate, err := isNodeImageSetUpToDate(current, desired)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(upToDate).To(BeFalse())
+	})
+
+	It("should return false if the NodeImageSet is applied by another field manager", func(ctx SpecContext) {
+		err := k8sClient.Apply(ctx, newNodeImageSet(), client.FieldOwner("other-manager"), client.ForceOwnership)
+		Expect(err).NotTo(HaveOccurred())
+
+		current := &ofenv1.NodeImageSet{}
+		err = k8sClient.Get(ctx, client.ObjectKey{Name: nodeImageSetName}, current)
+		Expect(err).NotTo(HaveOccurred())
+
+		upToDate, err := isNodeImageSetUpToDate(current, newNodeImageSet())
+		Expect(err).NotTo(HaveOccurred())
+		Expect(upToDate).To(BeFalse())
 	})
 })
