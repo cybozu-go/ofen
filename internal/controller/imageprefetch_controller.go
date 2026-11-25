@@ -11,6 +11,7 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -280,6 +281,11 @@ func (r *ImagePrefetchReconciler) createOrUpdateNodeImageSet(ctx context.Context
 		return fmt.Errorf("failed to list NodeImageSets: %w", err)
 	}
 
+	existingNodeImageSets := make(map[string]*ofenv1.NodeImageSet, len(nodeImageSetList.Items))
+	for i := range nodeImageSetList.Items {
+		existingNodeImageSets[nodeImageSetList.Items[i].Name] = &nodeImageSetList.Items[i]
+	}
+
 	maxNodeImageSetsToProcess := getMaxNodeImageSetsToCreate(nodeImageSetList, r.MaxConcurrentNodeImageSetCreations, len(selectedNodes), imgPrefetch.Generation)
 	selectNodes := map[string]struct{}{}
 	for i, nodeName := range selectedNodes {
@@ -298,6 +304,7 @@ func (r *ImagePrefetchReconciler) createOrUpdateNodeImageSet(ctx context.Context
 		if i < r.ImagePullNodeLimit {
 			registryPolicy = ofenv1.RegistryPolicyDefault
 		}
+
 		nodeImageSet := ofenv1apply.NodeImageSet(nodeImageSetName).
 			WithLabels(labelSet(imgPrefetch, nodeName)).
 			WithSpec(ofenv1apply.NodeImageSetSpec().
@@ -307,6 +314,18 @@ func (r *ImagePrefetchReconciler) createOrUpdateNodeImageSet(ctx context.Context
 				WithImagePullSecrets(imgPrefetch.Spec.ImagePullSecrets...).
 				WithImagePrefetchGeneration(imgPrefetch.Generation),
 			)
+
+		if current, ok := existingNodeImageSets[nodeImageSetName]; ok {
+			upToDate, err := isNodeImageSetUpToDate(current, nodeImageSet)
+			if err != nil {
+				// Log the error and continue to apply.
+				// If we failed the reconciliation here, it could be blocked permanently,
+				// because the retry processes NodeImageSets in the same order and may fail at the same one again.
+				logger.Error(err, "failed to compare NodeImageSet, applying it anyway", "name", nodeImageSetName)
+			} else if upToDate {
+				continue
+			}
+		}
 
 		if err := r.Apply(ctx, nodeImageSet, client.FieldOwner(constants.ImagePrefetchFieldManager), client.ForceOwnership); err != nil {
 			return fmt.Errorf("failed to apply NodeImageSet: %w", err)
@@ -337,6 +356,16 @@ func (r *ImagePrefetchReconciler) createOrUpdateNodeImageSet(ctx context.Context
 	}
 
 	return nil
+}
+
+// isNodeImageSetUpToDate returns true if the NodeImageSet already has the configuration that would be applied.
+// It compares only the fields owned by the field manager of ImagePrefetch controller.
+func isNodeImageSetUpToDate(current *ofenv1.NodeImageSet, desired *ofenv1apply.NodeImageSetApplyConfiguration) (bool, error) {
+	extracted, err := ofenv1apply.ExtractNodeImageSet(current, constants.ImagePrefetchFieldManager)
+	if err != nil {
+		return false, err
+	}
+	return equality.Semantic.DeepEqual(extracted, desired), nil
 }
 
 func getMaxNodeImageSetsToCreate(currentNodeImageSets ofenv1.NodeImageSetList, maxConcurrentNodeImageSetCreations int, desiredNodeImageSetsCount int, generation int64) int {

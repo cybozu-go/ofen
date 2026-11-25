@@ -3,6 +3,7 @@ package controller
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -12,6 +13,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -20,6 +22,7 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
 	ofenv1 "github.com/cybozu-go/ofen/api/v1"
+	ofenv1apply "github.com/cybozu-go/ofen/internal/applyconfigurations/api/v1"
 	"github.com/cybozu-go/ofen/internal/constants"
 )
 
@@ -106,10 +109,33 @@ func deleteAllNodes(ctx context.Context) {
 	}
 }
 
+// applyCountingClient counts the number of applies for each object.
+type applyCountingClient struct {
+	client.Client
+	mu     sync.Mutex
+	counts map[string]int
+}
+
+func (c *applyCountingClient) Apply(ctx context.Context, obj runtime.ApplyConfiguration, opts ...client.ApplyOption) error {
+	if nodeImageSet, ok := obj.(*ofenv1apply.NodeImageSetApplyConfiguration); ok {
+		c.mu.Lock()
+		c.counts[*nodeImageSet.Name]++
+		c.mu.Unlock()
+	}
+	return c.Client.Apply(ctx, obj, opts...)
+}
+
+func (c *applyCountingClient) count(name string) int {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.counts[name]
+}
+
 var _ = Describe("ImagePrefetch Controller", Serial, func() {
 	Context("When reconciling a resource", func() {
 		ctx := context.Background()
 		var stopFunc func()
+		var applyCounter *applyCountingClient
 
 		BeforeEach(func() {
 			mgr, err := ctrl.NewManager(cfg, ctrl.Options{
@@ -124,8 +150,9 @@ var _ = Describe("ImagePrefetch Controller", Serial, func() {
 			})
 			Expect(err).NotTo(HaveOccurred())
 
+			applyCounter = &applyCountingClient{Client: mgr.GetClient(), counts: map[string]int{}}
 			reconciler := &ImagePrefetchReconciler{
-				Client:                             mgr.GetClient(),
+				Client:                             applyCounter,
 				Scheme:                             mgr.GetScheme(),
 				ImagePullNodeLimit:                 imagePullNodeLimit,
 				MaxConcurrentNodeImageSetCreations: maxConcurrentNodeImageSetCreations,
@@ -503,6 +530,21 @@ var _ = Describe("ImagePrefetch Controller", Serial, func() {
 				g.Expect(conditionNoImagePrefetchFailed.Status).To(Equal(metav1.ConditionFalse))
 			}).Should(Succeed())
 
+			By("recording the number of applies for NodeImageSets")
+			nodeImageSets := &ofenv1.NodeImageSetList{}
+			err := k8sClient.List(ctx, nodeImageSets, &client.ListOptions{
+				LabelSelector: labels.SelectorFromSet(map[string]string{
+					constants.OwnerImagePrefetchNamespace: testName,
+				}),
+			})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(nodeImageSets.Items).To(HaveLen(replicas))
+			applyCounts := map[string]int{}
+			for _, nodeImageSet := range nodeImageSets.Items {
+				applyCounts[nodeImageSet.Name] = applyCounter.count(nodeImageSet.Name)
+				Expect(applyCounts[nodeImageSet.Name]).To(BeNumerically(">", 0))
+			}
+
 			By("updating nodeImageSet's status to image available")
 			failedCondition.Status = metav1.ConditionTrue
 			imageAvailableCondition := metav1.Condition{
@@ -546,6 +588,11 @@ var _ = Describe("ImagePrefetch Controller", Serial, func() {
 				g.Expect(conditionNoImagePrefetchFailed).NotTo(BeNil())
 				g.Expect(conditionNoImagePrefetchFailed.Status).To(Equal(metav1.ConditionTrue))
 			}).Should(Succeed())
+
+			By("checking that up-to-date NodeImageSets are not applied again")
+			for name, count := range applyCounts {
+				Expect(applyCounter.count(name)).To(Equal(count))
+			}
 
 			By("cleaning up the ImagePrefetch resource")
 			deleteImagePrefetchResource(ctx, imagePrefetch)
