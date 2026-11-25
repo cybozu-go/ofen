@@ -318,9 +318,11 @@ func (r *ImagePrefetchReconciler) createOrUpdateNodeImageSet(ctx context.Context
 		if current, ok := existingNodeImageSets[nodeImageSetName]; ok {
 			upToDate, err := isNodeImageSetUpToDate(current, nodeImageSet)
 			if err != nil {
-				return fmt.Errorf("failed to compare NodeImageSet: %w", err)
-			}
-			if upToDate {
+				// Log the error and continue to apply.
+				// If we failed the reconciliation here, it could be blocked permanently,
+				// because the retry processes NodeImageSets in the same order and may fail at the same one again.
+				logger.Error(err, "failed to compare NodeImageSet, applying it anyway", "name", nodeImageSetName)
+			} else if upToDate {
 				continue
 			}
 		}
